@@ -1,0 +1,1519 @@
+{
+ "version": "1.12.2",
+ "categories": [
+  "石材",
+  "混凝土",
+  "羊毛",
+  "陶瓦",
+  "木材",
+  "玻璃与光",
+  "其他"
+ ],
+ "total": 94,
+ "blocks": [
+  {
+   "id": 1,
+   "meta": 0,
+   "oldId": "1:0",
+   "nameEn": "stone",
+   "nameZh": "石头",
+   "hex": "#7E7E7E",
+   "rgb": [
+    126,
+    126,
+    126
+   ],
+   "rough": false,
+   "semantic": false,
+   "category": "石材"
+  },
+  {
+   "id": 1,
+   "meta": 1,
+   "oldId": "1:1",
+   "nameEn": "granite",
+   "nameZh": "花岗岩",
+   "hex": "#956756",
+   "rgb": [
+    149,
+    103,
+    86
+   ],
+   "rough": false,
+   "semantic": false,
+   "category": "其他"
+  },
+  {
+   "id": 1,
+   "meta": 2,
+   "oldId": "1:2",
+   "nameEn": "polished_granite",
+   "nameZh": "磨制花岗岩",
+   "hex": "#9A6B5B",
+   "rgb": [
+    154,
+    107,
+    91
+   ],
+   "rough": false,
+   "semantic": false,
+   "category": "其他"
+  },
+  {
+   "id": 1,
+   "meta": 3,
+   "oldId": "1:3",
+   "nameEn": "diorite",
+   "nameZh": "闪长岩",
+   "hex": "#C5C5C4",
+   "rgb": [
+    197,
+    197,
+    196
+   ],
+   "rough": false,
+   "semantic": false,
+   "category": "其他"
+  },
+  {
+   "id": 1,
+   "meta": 4,
+   "oldId": "1:4",
+   "nameEn": "polished_diorite",
+   "nameZh": "磨制闪长岩",
+   "hex": "#CDCDCD",
+   "rgb": [
+    205,
+    205,
+    205
+   ],
+   "rough": false,
+   "semantic": false,
+   "category": "其他"
+  },
+  {
+   "id": 1,
+   "meta": 5,
+   "oldId": "1:5",
+   "nameEn": "andesite",
+   "nameZh": "安山岩",
+   "hex": "#888B87",
+   "rgb": [
+    136,
+    139,
+    135
+   ],
+   "rough": false,
+   "semantic": false,
+   "category": "其他"
+  },
+  {
+   "id": 4,
+   "meta": 0,
+   "oldId": "4:0",
+   "nameEn": "cobblestone",
+   "nameZh": "圆石",
+   "hex": "#7A7A7A",
+   "rgb": [
+    122,
+    122,
+    122
+   ],
+   "rough": true,
+   "semantic": false,
+   "category": "石材"
+  },
+  {
+   "id": 98,
+   "meta": 0,
+   "oldId": "98:0",
+   "nameEn": "stonebrick",
+   "nameZh": "石砖",
+   "hex": "#7D7D7C",
+   "rgb": [
+    125,
+    125,
+    124
+   ],
+   "rough": true,
+   "semantic": false,
+   "category": "石材"
+  },
+  {
+   "id": 98,
+   "meta": 3,
+   "oldId": "98:3",
+   "nameEn": "stonebrick",
+   "nameZh": "錾制石砖",
+   "hex": "#777777",
+   "rgb": [
+    119,
+    119,
+    119
+   ],
+   "rough": true,
+   "semantic": false,
+   "category": "石材"
+  },
+  {
+   "id": 45,
+   "meta": 0,
+   "oldId": "45:0",
+   "nameEn": "brick_block",
+   "nameZh": "砖块",
+   "hex": "#96604E",
+   "rgb": [
+    150,
+    96,
+    78
+   ],
+   "rough": true,
+   "semantic": false,
+   "category": "石材"
+  },
+  {
+   "id": 24,
+   "meta": 0,
+   "oldId": "24:0",
+   "nameEn": "sandstone",
+   "nameZh": "砂岩",
+   "hex": "#D9CFA0",
+   "rgb": [
+    217,
+    207,
+    160
+   ],
+   "rough": false,
+   "semantic": false,
+   "category": "石材"
+  },
+  {
+   "id": 24,
+   "meta": 2,
+   "oldId": "24:2",
+   "nameEn": "sandstone",
+   "nameZh": "平滑砂岩",
+   "hex": "#D6CBA3",
+   "rgb": [
+    214,
+    203,
+    163
+   ],
+   "rough": false,
+   "semantic": false,
+   "category": "石材"
+  },
+  {
+   "id": 12,
+   "meta": 0,
+   "oldId": "12:0",
+   "nameEn": "sand",
+   "nameZh": "沙子",
+   "hex": "#DBCFA3",
+   "rgb": [
+    219,
+    207,
+    163
+   ],
+   "rough": true,
+   "semantic": false,
+   "category": "石材"
+  },
+  {
+   "id": 12,
+   "meta": 1,
+   "oldId": "12:1",
+   "nameEn": "sand",
+   "nameZh": "红沙",
+   "hex": "#B75A29",
+   "rgb": [
+    183,
+    90,
+    41
+   ],
+   "rough": true,
+   "semantic": false,
+   "category": "石材"
+  },
+  {
+   "id": 155,
+   "meta": 0,
+   "oldId": "155:0",
+   "nameEn": "quartz_block",
+   "nameZh": "石英块",
+   "hex": "#ECE9E2",
+   "rgb": [
+    236,
+    233,
+    226
+   ],
+   "rough": false,
+   "semantic": false,
+   "category": "石材"
+  },
+  {
+   "id": 42,
+   "meta": 0,
+   "oldId": "42:0",
+   "nameEn": "iron_block",
+   "nameZh": "铁块",
+   "hex": "#D9D9D9",
+   "rgb": [
+    217,
+    217,
+    217
+   ],
+   "rough": false,
+   "semantic": false,
+   "category": "石材"
+  },
+  {
+   "id": 41,
+   "meta": 0,
+   "oldId": "41:0",
+   "nameEn": "gold_block",
+   "nameZh": "金块",
+   "hex": "#F8DC5C",
+   "rgb": [
+    248,
+    220,
+    92
+   ],
+   "rough": false,
+   "semantic": false,
+   "category": "石材"
+  },
+  {
+   "id": 82,
+   "meta": 0,
+   "oldId": "82:0",
+   "nameEn": "clay",
+   "nameZh": "黏土块",
+   "hex": "#A0A6B3",
+   "rgb": [
+    160,
+    166,
+    179
+   ],
+   "rough": false,
+   "semantic": false,
+   "category": "石材"
+  },
+  {
+   "id": 13,
+   "meta": 0,
+   "oldId": "13:0",
+   "nameEn": "gravel",
+   "nameZh": "砂砾",
+   "hex": "#837E7E",
+   "rgb": [
+    131,
+    126,
+    126
+   ],
+   "rough": true,
+   "semantic": false,
+   "category": "石材"
+  },
+  {
+   "id": 49,
+   "meta": 0,
+   "oldId": "49:0",
+   "nameEn": "obsidian",
+   "nameZh": "黑曜石",
+   "hex": "#14121E",
+   "rgb": [
+    20,
+    18,
+    30
+   ],
+   "rough": false,
+   "semantic": false,
+   "category": "石材"
+  },
+  {
+   "id": 87,
+   "meta": 0,
+   "oldId": "87:0",
+   "nameEn": "netherrack",
+   "nameZh": "下界岩",
+   "hex": "#6B2020",
+   "rgb": [
+    107,
+    32,
+    32
+   ],
+   "rough": true,
+   "semantic": false,
+   "category": "石材"
+  },
+  {
+   "id": 112,
+   "meta": 0,
+   "oldId": "112:0",
+   "nameEn": "nether_brick",
+   "nameZh": "下界砖块",
+   "hex": "#2D1519",
+   "rgb": [
+    45,
+    21,
+    25
+   ],
+   "rough": true,
+   "semantic": false,
+   "category": "石材"
+  },
+  {
+   "id": 215,
+   "meta": 0,
+   "oldId": "215:0",
+   "nameEn": "red_nether_brick",
+   "nameZh": "红色下界砖块",
+   "hex": "#4A1A1C",
+   "rgb": [
+    74,
+    26,
+    28
+   ],
+   "rough": true,
+   "semantic": false,
+   "category": "石材"
+  },
+  {
+   "id": 168,
+   "meta": 0,
+   "oldId": "168:0",
+   "nameEn": "prismarine",
+   "nameZh": "海晶石",
+   "hex": "#63A89C",
+   "rgb": [
+    99,
+    168,
+    156
+   ],
+   "rough": true,
+   "semantic": false,
+   "category": "石材"
+  },
+  {
+   "id": 168,
+   "meta": 2,
+   "oldId": "168:2",
+   "nameEn": "prismarine",
+   "nameZh": "暗海晶石",
+   "hex": "#33534B",
+   "rgb": [
+    51,
+    83,
+    75
+   ],
+   "rough": true,
+   "semantic": false,
+   "category": "石材"
+  },
+  {
+   "id": 216,
+   "meta": 0,
+   "oldId": "216:0",
+   "nameEn": "bone_block",
+   "nameZh": "骨块",
+   "hex": "#E4E0CB",
+   "rgb": [
+    228,
+    224,
+    203
+   ],
+   "rough": false,
+   "semantic": false,
+   "category": "石材"
+  },
+  {
+   "id": 201,
+   "meta": 0,
+   "oldId": "201:0",
+   "nameEn": "purpur_block",
+   "nameZh": "紫珀块",
+   "hex": "#A97DA9",
+   "rgb": [
+    169,
+    125,
+    169
+   ],
+   "rough": false,
+   "semantic": false,
+   "category": "石材"
+  },
+  {
+   "id": 121,
+   "meta": 0,
+   "oldId": "121:0",
+   "nameEn": "end_brick",
+   "nameZh": "末地石",
+   "hex": "#DBDEA0",
+   "rgb": [
+    219,
+    222,
+    160
+   ],
+   "rough": false,
+   "semantic": false,
+   "category": "石材"
+  },
+  {
+   "id": 3,
+   "meta": 0,
+   "oldId": "3:0",
+   "nameEn": "dirt",
+   "nameZh": "泥土",
+   "hex": "#866043",
+   "rgb": [
+    134,
+    96,
+    67
+   ],
+   "rough": false,
+   "semantic": false,
+   "category": "石材"
+  },
+  {
+   "id": 3,
+   "meta": 2,
+   "oldId": "3:2",
+   "nameEn": "dirt",
+   "nameZh": "灰化土",
+   "hex": "#6B4A28",
+   "rgb": [
+    107,
+    74,
+    40
+   ],
+   "rough": false,
+   "semantic": false,
+   "category": "石材"
+  },
+  {
+   "id": 172,
+   "meta": 0,
+   "oldId": "172:0",
+   "nameEn": "hardened_clay",
+   "nameZh": "陶瓦",
+   "hex": "#985E43",
+   "rgb": [
+    152,
+    94,
+    67
+   ],
+   "rough": false,
+   "semantic": false,
+   "category": "陶瓦"
+  },
+  {
+   "id": 20,
+   "meta": 0,
+   "oldId": "20:0",
+   "nameEn": "glass",
+   "nameZh": "玻璃",
+   "hex": "#C7DCE8",
+   "rgb": [
+    199,
+    220,
+    232
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "玻璃与光"
+  },
+  {
+   "id": 95,
+   "meta": 3,
+   "oldId": "95:3",
+   "nameEn": "stained_glass",
+   "nameZh": "淡蓝色玻璃",
+   "hex": "#86A8C4",
+   "rgb": [
+    134,
+    168,
+    196
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "玻璃与光"
+  },
+  {
+   "id": 95,
+   "meta": 9,
+   "oldId": "95:9",
+   "nameEn": "stained_glass",
+   "nameZh": "青色玻璃",
+   "hex": "#4D8A99",
+   "rgb": [
+    77,
+    138,
+    153
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "玻璃与光"
+  },
+  {
+   "id": 95,
+   "meta": 11,
+   "oldId": "95:11",
+   "nameEn": "stained_glass",
+   "nameZh": "蓝色玻璃",
+   "hex": "#2E4A8E",
+   "rgb": [
+    46,
+    74,
+    142
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "玻璃与光"
+  },
+  {
+   "id": 95,
+   "meta": 15,
+   "oldId": "95:15",
+   "nameEn": "stained_glass",
+   "nameZh": "黑色玻璃",
+   "hex": "#26282B",
+   "rgb": [
+    38,
+    40,
+    43
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "玻璃与光"
+  },
+  {
+   "id": 20,
+   "meta": 1,
+   "oldId": "20:1",
+   "nameEn": "thin_glass",
+   "nameZh": "玻璃板",
+   "hex": "#C7DCE8",
+   "rgb": [
+    199,
+    220,
+    232
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "玻璃与光"
+  },
+  {
+   "id": 9,
+   "meta": 0,
+   "oldId": "9:0",
+   "nameEn": "water",
+   "nameZh": "水",
+   "hex": "#3F76E4",
+   "rgb": [
+    63,
+    118,
+    228
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "玻璃与光"
+  },
+  {
+   "id": 169,
+   "meta": 0,
+   "oldId": "169:0",
+   "nameEn": "sea_lantern",
+   "nameZh": "海晶灯",
+   "hex": "#A8CEC7",
+   "rgb": [
+    168,
+    206,
+    199
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "玻璃与光"
+  },
+  {
+   "id": 89,
+   "meta": 0,
+   "oldId": "89:0",
+   "nameEn": "glowstone",
+   "nameZh": "萤石",
+   "hex": "#FFDE8C",
+   "rgb": [
+    255,
+    222,
+    140
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "玻璃与光"
+  },
+  {
+   "id": 5,
+   "meta": 0,
+   "oldId": "5:0",
+   "nameEn": "planks",
+   "nameZh": "橡木木板",
+   "hex": "#B8945F",
+   "rgb": [
+    184,
+    148,
+    95
+   ],
+   "rough": false,
+   "semantic": false,
+   "category": "木材"
+  },
+  {
+   "id": 5,
+   "meta": 1,
+   "oldId": "5:1",
+   "nameEn": "planks",
+   "nameZh": "云杉木板",
+   "hex": "#735129",
+   "rgb": [
+    115,
+    81,
+    41
+   ],
+   "rough": false,
+   "semantic": false,
+   "category": "木材"
+  },
+  {
+   "id": 5,
+   "meta": 2,
+   "oldId": "5:2",
+   "nameEn": "planks",
+   "nameZh": "桦木木板",
+   "hex": "#D7C185",
+   "rgb": [
+    215,
+    193,
+    133
+   ],
+   "rough": false,
+   "semantic": false,
+   "category": "木材"
+  },
+  {
+   "id": 5,
+   "meta": 3,
+   "oldId": "5:3",
+   "nameEn": "planks",
+   "nameZh": "丛林木木板",
+   "hex": "#A07350",
+   "rgb": [
+    160,
+    115,
+    80
+   ],
+   "rough": false,
+   "semantic": false,
+   "category": "木材"
+  },
+  {
+   "id": 5,
+   "meta": 4,
+   "oldId": "5:4",
+   "nameEn": "planks",
+   "nameZh": "金合欢木板",
+   "hex": "#B05D2E",
+   "rgb": [
+    176,
+    93,
+    46
+   ],
+   "rough": false,
+   "semantic": false,
+   "category": "木材"
+  },
+  {
+   "id": 5,
+   "meta": 5,
+   "oldId": "5:5",
+   "nameEn": "planks",
+   "nameZh": "深色橡木木板",
+   "hex": "#3E2912",
+   "rgb": [
+    62,
+    41,
+    18
+   ],
+   "rough": false,
+   "semantic": false,
+   "category": "木材"
+  },
+  {
+   "id": 251,
+   "meta": 0,
+   "oldId": "251:0",
+   "nameEn": "concrete",
+   "nameZh": "白色混凝土",
+   "hex": "#CFD5D6",
+   "rgb": [
+    207,
+    213,
+    214
+   ],
+   "rough": false,
+   "semantic": false,
+   "category": "混凝土"
+  },
+  {
+   "id": 251,
+   "meta": 1,
+   "oldId": "251:1",
+   "nameEn": "concrete",
+   "nameZh": "橙色混凝土",
+   "hex": "#E06101",
+   "rgb": [
+    224,
+    97,
+    1
+   ],
+   "rough": false,
+   "semantic": false,
+   "category": "混凝土"
+  },
+  {
+   "id": 251,
+   "meta": 2,
+   "oldId": "251:2",
+   "nameEn": "concrete",
+   "nameZh": "品红色混凝土",
+   "hex": "#A9309F",
+   "rgb": [
+    169,
+    48,
+    159
+   ],
+   "rough": false,
+   "semantic": false,
+   "category": "混凝土"
+  },
+  {
+   "id": 251,
+   "meta": 3,
+   "oldId": "251:3",
+   "nameEn": "concrete",
+   "nameZh": "淡蓝色混凝土",
+   "hex": "#2389C6",
+   "rgb": [
+    35,
+    137,
+    198
+   ],
+   "rough": false,
+   "semantic": false,
+   "category": "混凝土"
+  },
+  {
+   "id": 251,
+   "meta": 4,
+   "oldId": "251:4",
+   "nameEn": "concrete",
+   "nameZh": "黄色混凝土",
+   "hex": "#F0AF15",
+   "rgb": [
+    240,
+    175,
+    21
+   ],
+   "rough": false,
+   "semantic": false,
+   "category": "混凝土"
+  },
+  {
+   "id": 251,
+   "meta": 5,
+   "oldId": "251:5",
+   "nameEn": "concrete",
+   "nameZh": "黄绿色混凝土",
+   "hex": "#5EA918",
+   "rgb": [
+    94,
+    169,
+    24
+   ],
+   "rough": false,
+   "semantic": false,
+   "category": "混凝土"
+  },
+  {
+   "id": 251,
+   "meta": 6,
+   "oldId": "251:6",
+   "nameEn": "concrete",
+   "nameZh": "粉红色混凝土",
+   "hex": "#D5658E",
+   "rgb": [
+    213,
+    101,
+    142
+   ],
+   "rough": false,
+   "semantic": false,
+   "category": "混凝土"
+  },
+  {
+   "id": 251,
+   "meta": 7,
+   "oldId": "251:7",
+   "nameEn": "concrete",
+   "nameZh": "灰色混凝土",
+   "hex": "#36393D",
+   "rgb": [
+    54,
+    57,
+    61
+   ],
+   "rough": false,
+   "semantic": false,
+   "category": "混凝土"
+  },
+  {
+   "id": 251,
+   "meta": 8,
+   "oldId": "251:8",
+   "nameEn": "concrete",
+   "nameZh": "淡灰色混凝土",
+   "hex": "#7D7D73",
+   "rgb": [
+    125,
+    125,
+    115
+   ],
+   "rough": false,
+   "semantic": false,
+   "category": "混凝土"
+  },
+  {
+   "id": 251,
+   "meta": 9,
+   "oldId": "251:9",
+   "nameEn": "concrete",
+   "nameZh": "青色混凝土",
+   "hex": "#157788",
+   "rgb": [
+    21,
+    119,
+    136
+   ],
+   "rough": false,
+   "semantic": false,
+   "category": "混凝土"
+  },
+  {
+   "id": 251,
+   "meta": 10,
+   "oldId": "251:10",
+   "nameEn": "concrete",
+   "nameZh": "紫色混凝土",
+   "hex": "#64209C",
+   "rgb": [
+    100,
+    32,
+    156
+   ],
+   "rough": false,
+   "semantic": false,
+   "category": "混凝土"
+  },
+  {
+   "id": 251,
+   "meta": 11,
+   "oldId": "251:11",
+   "nameEn": "concrete",
+   "nameZh": "蓝色混凝土",
+   "hex": "#2C2E8E",
+   "rgb": [
+    44,
+    46,
+    142
+   ],
+   "rough": false,
+   "semantic": false,
+   "category": "混凝土"
+  },
+  {
+   "id": 251,
+   "meta": 12,
+   "oldId": "251:12",
+   "nameEn": "concrete",
+   "nameZh": "棕色混凝土",
+   "hex": "#603C20",
+   "rgb": [
+    96,
+    60,
+    32
+   ],
+   "rough": false,
+   "semantic": false,
+   "category": "混凝土"
+  },
+  {
+   "id": 251,
+   "meta": 13,
+   "oldId": "251:13",
+   "nameEn": "concrete",
+   "nameZh": "绿色混凝土",
+   "hex": "#495B24",
+   "rgb": [
+    73,
+    91,
+    36
+   ],
+   "rough": false,
+   "semantic": false,
+   "category": "混凝土"
+  },
+  {
+   "id": 251,
+   "meta": 14,
+   "oldId": "251:14",
+   "nameEn": "concrete",
+   "nameZh": "红色混凝土",
+   "hex": "#8E2121",
+   "rgb": [
+    142,
+    33,
+    33
+   ],
+   "rough": false,
+   "semantic": false,
+   "category": "混凝土"
+  },
+  {
+   "id": 251,
+   "meta": 15,
+   "oldId": "251:15",
+   "nameEn": "concrete",
+   "nameZh": "黑色混凝土",
+   "hex": "#080A0F",
+   "rgb": [
+    8,
+    10,
+    15
+   ],
+   "rough": false,
+   "semantic": false,
+   "category": "混凝土"
+  },
+  {
+   "id": 35,
+   "meta": 0,
+   "oldId": "35:0",
+   "nameEn": "wool",
+   "nameZh": "白色羊毛",
+   "hex": "#E9ECEC",
+   "rgb": [
+    233,
+    236,
+    236
+   ],
+   "rough": false,
+   "semantic": false,
+   "category": "羊毛"
+  },
+  {
+   "id": 35,
+   "meta": 1,
+   "oldId": "35:1",
+   "nameEn": "wool",
+   "nameZh": "橙色羊毛",
+   "hex": "#F07613",
+   "rgb": [
+    240,
+    118,
+    19
+   ],
+   "rough": false,
+   "semantic": false,
+   "category": "羊毛"
+  },
+  {
+   "id": 35,
+   "meta": 2,
+   "oldId": "35:2",
+   "nameEn": "wool",
+   "nameZh": "品红色羊毛",
+   "hex": "#BD44B3",
+   "rgb": [
+    189,
+    68,
+    179
+   ],
+   "rough": false,
+   "semantic": false,
+   "category": "羊毛"
+  },
+  {
+   "id": 35,
+   "meta": 3,
+   "oldId": "35:3",
+   "nameEn": "wool",
+   "nameZh": "淡蓝色羊毛",
+   "hex": "#3AAFD9",
+   "rgb": [
+    58,
+    175,
+    217
+   ],
+   "rough": false,
+   "semantic": false,
+   "category": "羊毛"
+  },
+  {
+   "id": 35,
+   "meta": 4,
+   "oldId": "35:4",
+   "nameEn": "wool",
+   "nameZh": "黄色羊毛",
+   "hex": "#F8C627",
+   "rgb": [
+    248,
+    198,
+    39
+   ],
+   "rough": false,
+   "semantic": false,
+   "category": "羊毛"
+  },
+  {
+   "id": 35,
+   "meta": 5,
+   "oldId": "35:5",
+   "nameEn": "wool",
+   "nameZh": "黄绿色羊毛",
+   "hex": "#70B919",
+   "rgb": [
+    112,
+    185,
+    25
+   ],
+   "rough": false,
+   "semantic": false,
+   "category": "羊毛"
+  },
+  {
+   "id": 35,
+   "meta": 6,
+   "oldId": "35:6",
+   "nameEn": "wool",
+   "nameZh": "粉红色羊毛",
+   "hex": "#ED8DAC",
+   "rgb": [
+    237,
+    141,
+    172
+   ],
+   "rough": false,
+   "semantic": false,
+   "category": "羊毛"
+  },
+  {
+   "id": 35,
+   "meta": 7,
+   "oldId": "35:7",
+   "nameEn": "wool",
+   "nameZh": "灰色羊毛",
+   "hex": "#3E4447",
+   "rgb": [
+    62,
+    68,
+    71
+   ],
+   "rough": false,
+   "semantic": false,
+   "category": "羊毛"
+  },
+  {
+   "id": 35,
+   "meta": 8,
+   "oldId": "35:8",
+   "nameEn": "wool",
+   "nameZh": "淡灰色羊毛",
+   "hex": "#8E8E86",
+   "rgb": [
+    142,
+    142,
+    134
+   ],
+   "rough": false,
+   "semantic": false,
+   "category": "羊毛"
+  },
+  {
+   "id": 35,
+   "meta": 9,
+   "oldId": "35:9",
+   "nameEn": "wool",
+   "nameZh": "青色羊毛",
+   "hex": "#158991",
+   "rgb": [
+    21,
+    137,
+    145
+   ],
+   "rough": false,
+   "semantic": false,
+   "category": "羊毛"
+  },
+  {
+   "id": 35,
+   "meta": 10,
+   "oldId": "35:10",
+   "nameEn": "wool",
+   "nameZh": "紫色羊毛",
+   "hex": "#792AAC",
+   "rgb": [
+    121,
+    42,
+    172
+   ],
+   "rough": false,
+   "semantic": false,
+   "category": "羊毛"
+  },
+  {
+   "id": 35,
+   "meta": 11,
+   "oldId": "35:11",
+   "nameEn": "wool",
+   "nameZh": "蓝色羊毛",
+   "hex": "#35399D",
+   "rgb": [
+    53,
+    57,
+    157
+   ],
+   "rough": false,
+   "semantic": false,
+   "category": "羊毛"
+  },
+  {
+   "id": 35,
+   "meta": 12,
+   "oldId": "35:12",
+   "nameEn": "wool",
+   "nameZh": "棕色羊毛",
+   "hex": "#724728",
+   "rgb": [
+    114,
+    71,
+    40
+   ],
+   "rough": false,
+   "semantic": false,
+   "category": "羊毛"
+  },
+  {
+   "id": 35,
+   "meta": 13,
+   "oldId": "35:13",
+   "nameEn": "wool",
+   "nameZh": "绿色羊毛",
+   "hex": "#546D1B",
+   "rgb": [
+    84,
+    109,
+    27
+   ],
+   "rough": false,
+   "semantic": false,
+   "category": "羊毛"
+  },
+  {
+   "id": 35,
+   "meta": 14,
+   "oldId": "35:14",
+   "nameEn": "wool",
+   "nameZh": "红色羊毛",
+   "hex": "#A12722",
+   "rgb": [
+    161,
+    39,
+    34
+   ],
+   "rough": false,
+   "semantic": false,
+   "category": "羊毛"
+  },
+  {
+   "id": 35,
+   "meta": 15,
+   "oldId": "35:15",
+   "nameEn": "wool",
+   "nameZh": "黑色羊毛",
+   "hex": "#141519",
+   "rgb": [
+    20,
+    21,
+    25
+   ],
+   "rough": false,
+   "semantic": false,
+   "category": "羊毛"
+  },
+  {
+   "id": 159,
+   "meta": 0,
+   "oldId": "159:0",
+   "nameEn": "stained_hardened_clay",
+   "nameZh": "白色陶瓦",
+   "hex": "#D1B1A1",
+   "rgb": [
+    209,
+    177,
+    161
+   ],
+   "rough": false,
+   "semantic": false,
+   "category": "陶瓦"
+  },
+  {
+   "id": 159,
+   "meta": 1,
+   "oldId": "159:1",
+   "nameEn": "stained_hardened_clay",
+   "nameZh": "橙色陶瓦",
+   "hex": "#A15325",
+   "rgb": [
+    161,
+    83,
+    37
+   ],
+   "rough": false,
+   "semantic": false,
+   "category": "陶瓦"
+  },
+  {
+   "id": 159,
+   "meta": 2,
+   "oldId": "159:2",
+   "nameEn": "stained_hardened_clay",
+   "nameZh": "品红色陶瓦",
+   "hex": "#95576C",
+   "rgb": [
+    149,
+    87,
+    108
+   ],
+   "rough": false,
+   "semantic": false,
+   "category": "陶瓦"
+  },
+  {
+   "id": 159,
+   "meta": 3,
+   "oldId": "159:3",
+   "nameEn": "stained_hardened_clay",
+   "nameZh": "淡蓝色陶瓦",
+   "hex": "#706C8A",
+   "rgb": [
+    112,
+    108,
+    138
+   ],
+   "rough": false,
+   "semantic": false,
+   "category": "陶瓦"
+  },
+  {
+   "id": 159,
+   "meta": 4,
+   "oldId": "159:4",
+   "nameEn": "stained_hardened_clay",
+   "nameZh": "黄色陶瓦",
+   "hex": "#BA8523",
+   "rgb": [
+    186,
+    133,
+    35
+   ],
+   "rough": false,
+   "semantic": false,
+   "category": "陶瓦"
+  },
+  {
+   "id": 159,
+   "meta": 5,
+   "oldId": "159:5",
+   "nameEn": "stained_hardened_clay",
+   "nameZh": "黄绿色陶瓦",
+   "hex": "#677534",
+   "rgb": [
+    103,
+    117,
+    52
+   ],
+   "rough": false,
+   "semantic": false,
+   "category": "陶瓦"
+  },
+  {
+   "id": 159,
+   "meta": 6,
+   "oldId": "159:6",
+   "nameEn": "stained_hardened_clay",
+   "nameZh": "粉红色陶瓦",
+   "hex": "#A24D61",
+   "rgb": [
+    162,
+    77,
+    97
+   ],
+   "rough": false,
+   "semantic": false,
+   "category": "陶瓦"
+  },
+  {
+   "id": 159,
+   "meta": 7,
+   "oldId": "159:7",
+   "nameEn": "stained_hardened_clay",
+   "nameZh": "灰色陶瓦",
+   "hex": "#392A23",
+   "rgb": [
+    57,
+    42,
+    35
+   ],
+   "rough": false,
+   "semantic": false,
+   "category": "陶瓦"
+  },
+  {
+   "id": 159,
+   "meta": 8,
+   "oldId": "159:8",
+   "nameEn": "stained_hardened_clay",
+   "nameZh": "淡灰色陶瓦",
+   "hex": "#876B62",
+   "rgb": [
+    135,
+    107,
+    98
+   ],
+   "rough": false,
+   "semantic": false,
+   "category": "陶瓦"
+  },
+  {
+   "id": 159,
+   "meta": 9,
+   "oldId": "159:9",
+   "nameEn": "stained_hardened_clay",
+   "nameZh": "青色陶瓦",
+   "hex": "#575B5E",
+   "rgb": [
+    87,
+    91,
+    94
+   ],
+   "rough": false,
+   "semantic": false,
+   "category": "陶瓦"
+  },
+  {
+   "id": 159,
+   "meta": 10,
+   "oldId": "159:10",
+   "nameEn": "stained_hardened_clay",
+   "nameZh": "紫色陶瓦",
+   "hex": "#764656",
+   "rgb": [
+    118,
+    70,
+    86
+   ],
+   "rough": false,
+   "semantic": false,
+   "category": "陶瓦"
+  },
+  {
+   "id": 159,
+   "meta": 11,
+   "oldId": "159:11",
+   "nameEn": "stained_hardened_clay",
+   "nameZh": "蓝色陶瓦",
+   "hex": "#4A3B5B",
+   "rgb": [
+    74,
+    59,
+    91
+   ],
+   "rough": false,
+   "semantic": false,
+   "category": "陶瓦"
+  },
+  {
+   "id": 159,
+   "meta": 12,
+   "oldId": "159:12",
+   "nameEn": "stained_hardened_clay",
+   "nameZh": "棕色陶瓦",
+   "hex": "#4D3323",
+   "rgb": [
+    77,
+    51,
+    35
+   ],
+   "rough": false,
+   "semantic": false,
+   "category": "陶瓦"
+  },
+  {
+   "id": 159,
+   "meta": 13,
+   "oldId": "159:13",
+   "nameEn": "stained_hardened_clay",
+   "nameZh": "绿色陶瓦",
+   "hex": "#4C532A",
+   "rgb": [
+    76,
+    83,
+    42
+   ],
+   "rough": false,
+   "semantic": false,
+   "category": "陶瓦"
+  },
+  {
+   "id": 159,
+   "meta": 14,
+   "oldId": "159:14",
+   "nameEn": "stained_hardened_clay",
+   "nameZh": "红色陶瓦",
+   "hex": "#8F3D2E",
+   "rgb": [
+    143,
+    61,
+    46
+   ],
+   "rough": false,
+   "semantic": false,
+   "category": "陶瓦"
+  },
+  {
+   "id": 159,
+   "meta": 15,
+   "oldId": "159:15",
+   "nameEn": "stained_hardened_clay",
+   "nameZh": "黑色陶瓦",
+   "hex": "#251610",
+   "rgb": [
+    37,
+    22,
+    16
+   ],
+   "rough": false,
+   "semantic": false,
+   "category": "陶瓦"
+  }
+ ]
+}
