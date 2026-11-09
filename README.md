@@ -6,6 +6,12 @@
 
 ![界面预览](input/house.png)
 
+## 下载
+
+**Windows x64 免安装版（约 67 MB）** → [下载 v0.10.0](https://github.com/RikkaLove0721/Image-to-MC/releases/latest)
+
+解压后双击 `MC工程图.exe` 即可，不需要另装 Python 或 Node。整个文件夹一起放，不要只拷 exe。
+
 ## 功能
 
 - **多视角建模**：正/侧/俯/自由四种角色，最多四张；缺哪个方向就只从有的方向推断
