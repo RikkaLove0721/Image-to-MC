@@ -125,7 +125,7 @@ const SECTIONS = [
   margin: 0 0 6px;
   font-size: 13px;
   font-weight: 600;
-  color: var(--fg);
+  color: var(--text);
 }
 .help-sec ul {
   margin: 0;
@@ -138,7 +138,7 @@ const SECTIONS = [
   margin-bottom: 2px;
 }
 .help-sec li :deep(b) {
-  color: var(--fg);
+  color: var(--text);
   font-weight: 600;
 }
 .help-foot {
