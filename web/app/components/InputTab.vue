@@ -6,6 +6,14 @@ const props = defineProps<{
   images: Record<string, { url: string; original?: string; bytes?: number; uploadedAt?: string } | undefined>
   modelCount: number
   running: any
+  /** 这个项目上次用的生成设置（没有 = 新项目，用默认值） */
+  settings?: {
+    scale?: number
+    detail?: number
+    craft?: number
+    hint?: string
+    width?: number
+  } | null
 }>()
 
 const emit = defineEmits<{ refresh: []; generated: [name: string]; toast: [msg: string, type?: 'ok' | 'err'] }>()
@@ -86,6 +94,9 @@ const aiCfg = reactive({
 })
 const aiSpec = ref('')
 const aiBusy = ref(false)
+/** 方案生成已用时（秒）。界面不显示这个的话，两分钟的不动光标看起来就是卡死 */
+const planElapsed = ref(0)
+let planTimer: ReturnType<typeof setInterval> | null = null
 /** 服务端真实提供的模型名，用于输入框下拉提示（模型名写错最难自查） */
 const modelList = ref<string[]>([])
 const aiBrief = ref<any>(null)
@@ -243,6 +254,31 @@ async function remove(role: Role) {
   }
 }
 
+/* ---- 记住本项目的生成设置 ---- */
+// 存在 project.json 里：换项目就是换一套参数，别人新建的项目从默认值开始。
+let settingsTimer: ReturnType<typeof setTimeout> | null = null
+/** 正在把磁盘上的设置灌进控件：这期间的 watch 不是用户操作，别写回文件 */
+let hydratingSettings = true
+function persistSettings() {
+  if (hydratingSettings) return
+  if (settingsTimer) clearTimeout(settingsTimer)
+  settingsTimer = setTimeout(() => {
+    $fetch(`/api/projects/${props.projectId}/settings`, {
+      method: 'POST',
+      body: {
+        scale: scale.value,
+        detail: detailLevel.value,
+        craft: craft.value,
+        hint: aiCfg.hint,
+      },
+    }).catch(() => {
+      /* 存不下来不影响本次生成 */
+    })
+  }, 500)
+}
+
+watch([scale, detailLevel, craft, () => aiCfg.hint], persistSettings)
+
 /* ---- AI 配置与出图 ---- */
 
 onMounted(async () => {
@@ -264,6 +300,20 @@ onMounted(async () => {
   } catch {
     /* 没配置就留空 */
   }
+  // 套用这个项目上次的参数（新项目没有 settings，保持默认）
+  const st = props.settings
+  if (st) {
+    if (typeof st.scale === 'number') scale.value = Math.min(SCALE_MAX, Math.max(SCALE_MIN, st.scale))
+    if (typeof st.detail === 'number') detailLevel.value = Math.min(4, Math.max(1, Math.round(st.detail)))
+    if (typeof st.craft === 'number') craft.value = Math.min(2, Math.max(0, Math.round(st.craft)))
+    if (typeof st.hint === 'string') aiCfg.hint = st.hint
+  }
+  // 灌完之后放开写入：否则一进项目就把同样的值再写一遍，
+  // 改了 mtime 会让「目录指纹」判定为变化、页面无谓重载一次。
+  nextTick(() => {
+    hydratingSettings = false
+  })
+
   // 顺手拉一份模型清单：填错模型名和"没联网"在界面上长得一样，很难自查
   try {
     const m = await $fetch<any>('/api/ai/models')
@@ -339,9 +389,17 @@ async function makePlan() {
   aiError.value = ''
   aiNote.value = ''
   aiVisionDiff.value = null
+  planElapsed.value = 0
+  if (planTimer) clearInterval(planTimer)
+  planTimer = setInterval(() => (planElapsed.value += 1), 1000)
+  // 看门狗：服务端两分钟内会收尾，超过四分钟一定是链路出了问题，
+  // 与其让按钮永远转下去，不如报个明白。
+  const ctrl = new AbortController()
+  const watchdog = setTimeout(() => ctrl.abort(), 240_000)
   try {
     const res = await $fetch<any>(`/api/projects/${props.projectId}/ai/plan`, {
       method: 'POST',
+      signal: ctrl.signal,
       body: {
         scale: scale.value,
         detail: detailLevel.value,
@@ -397,9 +455,15 @@ async function makePlan() {
       tail ? 'err' : 'ok',
     )
   } catch (err: any) {
-    aiError.value = err?.data?.statusMessage || '生成失败'
+    const aborted = err?.name === 'AbortError' || /aborted|abort/i.test(String(err?.message || ''))
+    aiError.value = aborted
+      ? '等了 4 分钟还没回来，已中止。可能是网络或 AI 接口太慢，重试一次通常就好。'
+      : err?.data?.statusMessage || '生成失败'
     emit('toast', aiError.value, 'err')
   } finally {
+    clearTimeout(watchdog)
+    if (planTimer) clearInterval(planTimer)
+    planTimer = null
     aiBusy.value = false
   }
 }
@@ -745,11 +809,16 @@ watch(log, scrollLog)
             <button class="btn" @click="saveCfg">保存配置</button>
             <button class="btn" :disabled="aiBusy || !images?.front" @click="makePlan">
               <span v-if="aiBusy" class="spinner" />
-              {{ aiBusy ? 'AI 思考中' : '让 AI 出方案' }}
+              {{ aiBusy ? `AI 思考中 ${planElapsed}s` : '让 AI 出方案' }}
             </button>
             <button class="btn primary" :disabled="!aiSpec || status === 'running'" @click="buildPlan">
               {{ status === 'running' ? '正在生成' : '按方案生成' }}
             </button>
+          </div>
+
+          <div v-if="aiBusy" class="vision-note" style="margin-top: 2px">
+            正在走完整流程：本地量比例 → AI 判读照片 → 写蓝图 → 构建体检 → 修正。
+            通常 1~2 分钟（最多 2.5 分钟会自动收尾），期间请不要关闭窗口。
           </div>
 
           <div style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted)">

@@ -21,6 +21,19 @@ export interface Project {
   updatedAt: string
   images: Partial<Record<ViewRole, ViewImage>>
   lastModel?: string
+  /**
+   * 这个项目的生成设置（比例尺 / 细节等级 / 建筑技巧性 / 补充要求）。
+   * 存在项目里而不是全局：同一个人会同时做"精细的宫殿"和"粗糙的示意图"，
+   * 全局记忆等于让后一个项目继承前一个项目的口味。
+   * 没有这个字段 = 新项目，用默认值。
+   */
+  settings?: {
+    scale?: number
+    detail?: number
+    craft?: number
+    hint?: string
+    width?: number
+  }
 }
 
 export interface ModelFile {
