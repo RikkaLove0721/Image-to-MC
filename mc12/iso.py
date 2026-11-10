@@ -13,6 +13,16 @@ from PIL import Image, ImageDraw
 
 from .palette import Block
 
+# 非整方块：栅栏、铁栏杆、玻璃板、圆石墙、末地烛。
+# 这些方块在游戏里只占一格中间的一细条，画成实心立方体的话，
+# 甲板边缘的一圈栏杆会变成一堵墙，把整个上层建筑糊死 ——
+# 预览里根本看不出那里是栏杆，也就没法拿渲染图去核对照片。
+THIN_KEYS = ("fence", "iron_bars", "pane", "wall", "end_rod", "vine", "banner")
+
+
+def _is_thin(block: Block) -> bool:
+    return any(k in block.name_en for k in THIN_KEYS)
+
 
 def render(
     path: str | Path,
@@ -71,10 +81,18 @@ def render(
     for idx in order:
         x, y, z = int(xs[idx]), int(ys[idx]), int(zs[idx])
         c = tuple(int(v) for v in cols[idx])
+        if _is_thin(blocks[int(vals[idx])]):
+            # 细杆：横截面取中间 30%，高度仍占满一格
+            a, b = 0.35, 0.65
+            x0f, x1f = x + a, x + b
+            z0f, z1f = z + a, z + b
+        else:
+            x0f, x1f = float(x), float(x + 1)
+            z0f, z1f = float(z), float(z + 1)
 
-        top = [proj(x, y + 1, z), proj(x + 1, y + 1, z), proj(x + 1, y + 1, z + 1), proj(x, y + 1, z + 1)]
-        east = [proj(x + 1, y, z), proj(x + 1, y, z + 1), proj(x + 1, y + 1, z + 1), proj(x + 1, y + 1, z)]
-        south = [proj(x, y, z + 1), proj(x + 1, y, z + 1), proj(x + 1, y + 1, z + 1), proj(x, y + 1, z + 1)]
+        top = [proj(x0f, y + 1, z0f), proj(x1f, y + 1, z0f), proj(x1f, y + 1, z1f), proj(x0f, y + 1, z1f)]
+        east = [proj(x1f, y, z0f), proj(x1f, y, z1f), proj(x1f, y + 1, z1f), proj(x1f, y + 1, z0f)]
+        south = [proj(x0f, y, z1f), proj(x1f, y, z1f), proj(x1f, y + 1, z1f), proj(x0f, y + 1, z1f)]
 
         # 朝向观察者的南面（z+）就是照片立面本身，压太暗会让整张图像发霉；
         # 三面亮度比参考 Minecraft 本体：顶面最亮，正面次之，侧面最暗。

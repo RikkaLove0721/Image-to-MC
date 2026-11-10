@@ -17,66 +17,115 @@ const ROLE_META: { role: Role; label: string; hint: string; required?: boolean }
   { role: 'free', label: '自由视角', hint: '任意角度，校准整体颜色' },
 ]
 
-const MODES = [
-  { value: 'synth', label: '立面合成（推荐）', desc: '照片只提供层数、窗距与配色，立面由文法重新合成，左右对称、窗阵对齐。多视角在这里生效最完整。' },
-  { value: 'building', label: '按照片重建', desc: '逐格还原照片里的立面，杂乱也一起保留。适合老墙、不规则立面。' },
-  { value: 'hall', label: '室内大厅', desc: '一点透视的室内照（泳池 / 展厅），重建下沉水池、柱廊、壁画与藻井吊顶。' },
-  { value: 'relief', label: '浮雕', desc: '把照片压成有起伏的浅浮雕，适合山墙、雕刻、壁画。' },
-  { value: 'flat', label: '平板', desc: '最薄的一层像素墙，只做颜色还原，不追求立体。' },
-  { value: 'terrain', label: '地貌', desc: '山体、坡地等地形照，按亮度生成高低起伏。' },
-]
+/**
+ * 尺寸 = 比例尺（1 米 = 多少格），不再是"写死多少格宽"。
+ *
+ * AI 先判断建筑类型与实际尺寸（米），再用这个比例尺换算成格数。
+ * 这样"高度大于宽度"的窄楼不会被强行铺成一条长板。
+ * 范围 0.5~8 格/米：0.5 是袖珍摆件尺度，8 是一格约 12.5 厘米的超精细尺度。
+ */
+const SCALE_MIN = 0.5
+const SCALE_MAX = 8
+const SCALE_DEFAULT = 2
+const scale = ref(SCALE_DEFAULT)
 
-const PRESETS = [
-  { value: 'xs', label: 'xs · 24 格' },
-  { value: 's', label: 's · 32 格' },
-  { value: 'm', label: 'm · 40 格（默认）' },
-  { value: 'l', label: 'l · 56 格' },
-  { value: 'xl', label: 'xl · 80 格' },
-]
+/**
+ * 游戏建筑技巧性 0/1/2（低/中/高），默认中。
+ * 这不是"精细度"，是"风格取向"：高 → 优先套用 MC 社区建筑法则，
+ * 允许偏离照片的逐像素还原；低 → 尽量照抄照片。
+ */
+const craft = ref(1)
+const CRAFT_LABEL = ['低 · 贴近照片', '中 · 还原为主', '高 · 社区法则优先']
+const detailLevel = ref(2)
+const DETAIL_LABEL: Record<number, string> = { 1: '基础', 2: '标准', 3: '精细' }
 
-const PARAM_SPEC: Record<string, { key: string; label: string; placeholder: string; hint?: string }[]> = {
-  synth: [
-    { key: 'depth', label: '进深（格）', placeholder: '留空按视角推断', hint: '多视角时自动取侧视/俯视的估计' },
-    { key: 'floors', label: '层数', placeholder: '留空自动识别', hint: '识别不准时手动锁定' },
-  ],
-  building: [{ key: 'depth', label: '墙体厚度', placeholder: '3', hint: '沿 Z 挤出的格数' }],
-  hall: [
-    { key: 'length', label: '厅深', placeholder: '自动', hint: '沿 Z 的长度' },
-    { key: 'height', label: '净高', placeholder: '自动' },
-    { key: 'bays', label: '柱对数', placeholder: '4' },
-    { key: 'cell', label: '藻井格边长', placeholder: '5' },
-    { key: 'depth', label: '池深', placeholder: '3' },
-    { key: 'width', label: '厅宽', placeholder: '跟随预设' },
-  ],
-  relief: [{ key: 'strength', label: '起伏强度', placeholder: '4', hint: '数值越大越立体' }],
-  flat: [],
-  terrain: [{ key: 'strength', label: '起伏强度', placeholder: '按亮度', hint: '留空由照片亮度决定' }],
+/** AI 上次判断出来的建筑实际尺寸（米），自动选尺寸时要用 */
+const buildingMeters = ref<number[] | null>(null)
+const buildingType = ref('')
+
+/** 按"模型别太大也别太小"反推一个比例尺：目标约 3500 块的表面积 */
+function autoScale() {
+  const m = buildingMeters.value || [15, 18, 12]
+  const [bw, bh, bd] = m
+  const faces = 2 * (bw * bh + bh * bd + bw * bd) // 平方米
+  const target = 3600 // 方块数，中等体量的观感上限
+  const raw = Math.sqrt(target / Math.max(faces, 1))
+  const snapped = Math.round(raw * 2) / 2 // 对齐到 0.5
+  scale.value = Math.min(SCALE_MAX, Math.max(SCALE_MIN, snapped))
+  emit('toast', `按 ${bw}×${bh}×${bd} 米估算：${scale.value.toFixed(1)} 格/米`)
 }
 
-const paramsByMode = reactive<Record<string, Record<string, string>>>({
-  synth: { depth: '', floors: '' },
-  building: { depth: '3' },
-  hall: { length: '', height: '', bays: '4', cell: '5', depth: '3', width: '' },
-  relief: { strength: '4' },
-  flat: {},
-  terrain: { strength: '' },
+const scaleHint = computed(() => {
+  const m = buildingMeters.value
+  if (!m) return ''
+  const w = Math.round(m[0] * scale.value)
+  const h = Math.round(m[1] * scale.value)
+  const d = Math.round(m[2] * scale.value)
+  return `≈ ${w} × ${h} × ${d} 格`
 })
 
-const mode = ref('synth')
-const preset = ref('m')
-const advanced = ref(false)
-const adv = reactive({
-  sat: '1.5',
-  clean: '2',
-  dedupe: '10',
-  median: '9',
-  no_glass: false,
-  sym: false,
-  no_sky: false,
+const aiCfg = reactive({
+  baseUrl: '',
+  model: '',
+  hasKey: false,
+  keyHint: '',
+  keyInput: '',
+  hint: '',
+  // 视觉：留空就是"用主模型自己看图"，填了才换成单独的视觉模型
+  visionBaseUrl: '',
+  visionModel: '',
+  hasVisionKey: false,
+  visionKeyHint: '',
+  visionKeyInput: '',
+  visionOpen: false,
+  // 探测结论：true 能读图 / false 读不出 / null 还没测
+  visionEffective: '',
+  visionOk: null as boolean | null,
+  visionNote: '',
+  probing: false,
 })
+const aiSpec = ref('')
+const aiBusy = ref(false)
+/** 服务端真实提供的模型名，用于输入框下拉提示（模型名写错最难自查） */
+const modelList = ref<string[]>([])
+const aiBrief = ref<any>(null)
+const aiVision = ref<any>(null)
+const aiVisionDiff = ref<any>(null)
+/** 主体是舰船时，判读的那套字段（层数/开间/屋顶）没意义，换成船长和甲板设备 */
+const isShipVision = computed(() =>
+  ['ship', 'vessel', 'warship', 'boat'].includes(String(aiVision.value?.subject || '')),
+)
+const bowLabel = computed(() => {
+  const m: Record<string, string> = {
+    left: '画面左侧',
+    right: '画面右侧',
+    toward: '正对镜头',
+    away: '背对镜头',
+  }
+  return m[String(aiVision.value?.ship?.bow || '')] || ''
+})
+/** 服务端给的额外说明（比如"主体不是建筑，构建器没有这套语汇"） */
+const aiNote = ref('')
+const aiError = ref('')
+/** 这一次生成的身份：种子用于复现，得分/轮次用于判断"够不够像" */
+const aiSeed = ref<number | null>(null)
+/** 这一轮方案花了多少 token（仓库页展示） */
+const aiUsage = ref<any>(null)
+/** 分析过程快照：仓库页「修改」时要把它喂回 AI */
+const aiAnalysis = ref<any>(null)
+const aiScore = ref<number | null>(null)
+/** 照片被裁掉一侧时，按对称补全的记录：{cut:['left'], ratio:1.28} */
+const aiComplete = ref<{ cut: string[]; ratio: number } | null>(null)
+const aiRounds = ref<{ round: number; score: number; issues: string[] }[]>([])
 
-const currentMode = computed(() => MODES.find((m) => m.value === mode.value) || MODES[0])
-const params = computed(() => paramsByMode[mode.value] || {})
+/** 标题栏那一行小字：说清"谁来看图、测得怎么样"。 */
+const visionStateText = computed(() => {
+  if (!aiCfg.hasKey) return '未配置'
+  const who = aiCfg.visionEffective || aiCfg.model || '—'
+  if (aiCfg.visionOk === true) return `能读图 · ${who}`
+  if (aiCfg.visionOk === false) return `读不出图 · ${who}`
+  return `待检测 · ${who}`
+})
 
 const job = ref<any>(null)
 const log = ref('')
@@ -91,7 +140,6 @@ let pollFails = 0
 let tickTimer: ReturnType<typeof setInterval> | null = null
 
 const imageCount = computed(() => ROLE_META.filter((r) => props.images?.[r.role]).length)
-const multiViewMismatch = computed(() => imageCount.value > 1 && mode.value !== 'synth')
 
 const progress = computed(() => {
   if (status.value === 'done') return 100
@@ -117,6 +165,8 @@ const logLines = computed(() =>
     }),
 )
 
+/* ---- 视角素材 ---- */
+
 function pick(role: Role) {
   if (uploading.value) return
   pendingRole.value = role
@@ -137,7 +187,7 @@ function onDrop(role: Role, event: DragEvent) {
   if (file) upload(role, file)
 }
 
-async function upload(role: Role, file: File) {
+async function upload(role: Role, file: File, quiet = false) {
   if (!file.type.startsWith('image/')) {
     emit('toast', '只能上传图片文件', 'err')
     return
@@ -149,13 +199,40 @@ async function upload(role: Role, file: File) {
   try {
     await $fetch(`/api/projects/${props.projectId}/images`, { method: 'POST', body: fd })
     emit('refresh')
-    emit('toast', `${ROLE_META.find((r) => r.role === role)?.label} 已上传`)
+    if (!quiet) emit('toast', `${ROLE_META.find((r) => r.role === role)?.label} 已上传`)
   } catch (err: any) {
     emit('toast', err?.data?.statusMessage || '上传失败', 'err')
   } finally {
     uploading.value = null
   }
 }
+
+/* ---- 从剪贴板粘贴 ---- */
+
+function emptyRole(): Role | null {
+  const hit = ROLE_META.find((r) => !props.images?.[r.role])
+  return hit ? hit.role : null
+}
+
+async function onPaste(event: ClipboardEvent) {
+  const items = Array.from(event.clipboardData?.items || [])
+  const image = items.find((i) => i.type.startsWith('image/'))
+  if (!image) return // 贴文字时不动它
+  const file = image.getAsFile()
+  if (!file) return
+  event.preventDefault()
+  if (uploading.value) return
+  const role = emptyRole()
+  if (!role) {
+    emit('toast', '四张视角都满了，先移除一张再粘贴', 'err')
+    return
+  }
+  await upload(role, file, true)
+  emit('toast', `已从剪贴板粘贴到「${ROLE_META.find((r) => r.role === role)?.label}」`)
+}
+
+onMounted(() => document.addEventListener('paste', onPaste))
+onBeforeUnmount(() => document.removeEventListener('paste', onPaste))
 
 async function remove(role: Role) {
   try {
@@ -166,36 +243,190 @@ async function remove(role: Role) {
   }
 }
 
-function buildPayload() {
-  const payload: Record<string, any> = {
-    mode: mode.value,
-    preset: preset.value,
-    sat: adv.sat,
-    clean: adv.clean,
-    dedupe: adv.dedupe,
-    median: adv.median,
-    no_glass: adv.no_glass,
-    sym: adv.sym,
-    no_sky: adv.no_sky,
+/* ---- AI 配置与出图 ---- */
+
+onMounted(async () => {
+  try {
+    const cfg = await $fetch<any>('/api/ai/config')
+    aiCfg.baseUrl = cfg.baseUrl
+    aiCfg.model = cfg.model
+    aiCfg.hasKey = cfg.hasKey
+    aiCfg.keyHint = cfg.keyHint
+    aiCfg.visionBaseUrl = cfg.visionBaseUrl || ''
+    aiCfg.visionModel = cfg.visionModel || ''
+    aiCfg.hasVisionKey = !!cfg.hasVisionKey
+    aiCfg.visionKeyHint = cfg.visionKeyHint || ''
+    aiCfg.visionEffective = cfg.visionEffective || ''
+    aiCfg.visionOk = cfg.visionOk ?? null
+    aiCfg.visionNote = cfg.visionNote || ''
+    // 用了单独的视觉模型、或者测出来看不了图，才把这一栏展开
+    aiCfg.visionOpen = !!cfg.visionModel || cfg.visionOk === false
+  } catch {
+    /* 没配置就留空 */
   }
-  for (const [key, value] of Object.entries(params.value)) {
-    if (value !== '' && value !== null && value !== undefined) payload[key] = value
+  // 顺手拉一份模型清单：填错模型名和"没联网"在界面上长得一样，很难自查
+  try {
+    const m = await $fetch<any>('/api/ai/models')
+    modelList.value = Array.isArray(m?.models) ? m.models : []
+  } catch {
+    /* 拉不到就不给提示，不影响填写 */
   }
-  return payload
+  if (props.running?.id) {
+    job.value = props.running
+    status.value = 'running'
+    log.value = props.running.log || ''
+    startTimers()
+  }
+})
+
+/** 强制重测看图能力：换了模型、或者怀疑结论过期时点。 */
+async function probeVision() {
+  aiCfg.probing = true
+  try {
+    const r = await $fetch<any>('/api/ai/vision', { method: 'POST' })
+    aiCfg.visionEffective = r.visionEffective || ''
+    aiCfg.visionOk = r.visionOk ?? null
+    aiCfg.visionNote = r.visionNote || r.probe?.note || r.error || ''
+    emit('toast', aiCfg.visionNote || '检测完成', aiCfg.visionOk ? 'ok' : 'err')
+  } catch (err: any) {
+    emit('toast', err?.data?.statusMessage || '检测失败', 'err')
+  } finally {
+    aiCfg.probing = false
+  }
 }
 
-async function start() {
+async function saveCfg() {
+  try {
+    const cfg = await $fetch<any>('/api/ai/config', {
+      method: 'POST',
+      body: {
+        baseUrl: aiCfg.baseUrl,
+        model: aiCfg.model,
+        apiKey: aiCfg.keyInput,
+        vision: {
+          baseUrl: aiCfg.visionBaseUrl,
+          model: aiCfg.visionModel,
+          apiKey: aiCfg.visionKeyInput,
+        },
+      },
+    })
+    aiCfg.hasKey = cfg.hasKey
+    aiCfg.keyHint = cfg.keyHint
+    aiCfg.keyInput = ''
+    aiCfg.hasVisionKey = !!cfg.hasVisionKey
+    aiCfg.visionKeyHint = cfg.visionKeyHint || ''
+    aiCfg.visionKeyInput = ''
+    aiCfg.visionEffective = cfg.visionEffective || ''
+    aiCfg.visionOk = cfg.visionOk ?? null
+    aiCfg.visionNote = cfg.visionNote || ''
+    emit(
+      'toast',
+      cfg.visionModel
+        ? `已保存，看图用 ${cfg.visionModel}`
+        : `已保存，看图用主模型 ${cfg.model}`,
+    )
+  } catch (err: any) {
+    emit('toast', err?.data?.statusMessage || '保存失败', 'err')
+  }
+}
+
+async function makePlan() {
   if (!props.images?.front) {
     emit('toast', '先上传一张正视图', 'err')
+    return
+  }
+  aiBusy.value = true
+  aiError.value = ''
+  aiNote.value = ''
+  aiVisionDiff.value = null
+  try {
+    const res = await $fetch<any>(`/api/projects/${props.projectId}/ai/plan`, {
+      method: 'POST',
+      body: {
+        scale: scale.value,
+        detail: detailLevel.value,
+        craft: craft.value,
+        hint: aiCfg.hint,
+      },
+    })
+    aiBrief.value = res.brief
+    aiVision.value = res.vision || null
+    aiVisionDiff.value = res.visionDiff || null
+    aiNote.value = String(res.note || '')
+    // 这一轮实际用谁看的图、看得怎么样：写回配置面板，省得用户自己猜
+    const vp = res.visionProbe
+    if (vp) {
+      aiCfg.visionEffective = vp.model || aiCfg.visionEffective
+      aiCfg.visionOk = !!vp.ok
+      aiCfg.visionNote = String(vp.note || '')
+    }
+    aiSpec.value = JSON.stringify(res.spec, null, 2)
+    aiSeed.value = Number(res.seed) || null
+    aiUsage.value = res.usage || null
+    aiAnalysis.value = res.analysis || null
+    aiScore.value = typeof res.score === 'number' ? res.score : null
+    // 照片被裁过：接口会按对称把建筑补全，把"补了多少"带回界面
+    const cpt = res.spec?.complete
+    aiComplete.value =
+      cpt && Array.isArray(cpt.cut) && cpt.cut.length
+        ? { cut: cpt.cut.map(String), ratio: Number(cpt.ratio) || 1 }
+        : null
+    aiRounds.value = Array.isArray(res.rounds) ? res.rounds : []
+    // AI 会先判断建筑类型与实际尺寸，存下来给"自动选尺寸"和提示用
+    const b = res.spec?.building
+    if (b?.meters?.length === 3) {
+      buildingMeters.value = b.meters.map(Number)
+      buildingType.value = String(b.type || '')
+    }
+    const m = buildingMeters.value
+    const scoreText =
+      aiScore.value !== null ? `，体检 ${aiScore.value} 分（第 ${aiRounds.value.length} 轮）` : ''
+    const v = aiVision.value
+    const visionText = v?.type ? `，看图判读：${v.type}` : ''
+    // 看不了图时要说清楚：不是"没配"，而是"这个模型看不见"，否则用户会以为功能坏了
+    const blind =
+      res.visionProbe && res.visionProbe.ok === false
+        ? `\n注意：${res.visionProbe.model} 读不出图，这一轮只用了本地量测（比例/窗阵靠像素算，类型和构件靠猜）。换成 deepseek-flash 这类能看图的模型会准很多。`
+        : ''
+    const tail = String(res.note || '') || blind
+    emit(
+      'toast',
+      (m
+        ? `方案已生成：${buildingType.value || '建筑'} 约 ${m[0]}×${m[1]}×${m[2]} 米${scoreText}${visionText}`
+        : `方案已生成${scoreText}${visionText}，检查无误后按方案生成`) + (tail ? `\n${tail}` : ''),
+      tail ? 'err' : 'ok',
+    )
+  } catch (err: any) {
+    aiError.value = err?.data?.statusMessage || '生成失败'
+    emit('toast', aiError.value, 'err')
+  } finally {
+    aiBusy.value = false
+  }
+}
+
+async function buildPlan() {
+  let spec: any
+  try {
+    spec = JSON.parse(aiSpec.value)
+  } catch {
+    emit('toast', '蓝图 JSON 写得不对，先改一下', 'err')
     return
   }
   log.value = ''
   status.value = 'running'
   elapsed.value = 0
+  // 用户手改蓝图时可能把 seed 删掉了：补回来，生成出来的模型才可复现
+  if (aiSeed.value && spec.seed == null) spec.seed = aiSeed.value
   try {
-    const res = await $fetch<{ job: any }>(`/api/projects/${props.projectId}/generate`, {
+    const res = await $fetch<{ job: any }>(`/api/projects/${props.projectId}/ai/build`, {
       method: 'POST',
-      body: buildPayload(),
+      body: {
+        spec,
+        // 一起写进仓库：花了多少 token、这次是怎么分析出来的
+        meta: aiUsage.value || aiAnalysis.value
+          ? { usage: aiUsage.value, analysis: aiAnalysis.value }
+          : null,
+      },
     })
     job.value = res.job
     startTimers()
@@ -239,7 +470,7 @@ async function poll() {
     } else {
       emit('toast', `生成失败（退出码 ${res.code}），日志里能看到原因`, 'err')
     }
-  } catch (err) {
+  } catch {
     pollFails += 1
     if (pollFails > 30) {
       status.value = 'failed'
@@ -250,15 +481,6 @@ async function poll() {
     pollTimer = setTimeout(poll, 1500)
   }
 }
-
-onMounted(() => {
-  if (props.running?.id) {
-    job.value = props.running
-    status.value = 'running'
-    log.value = props.running.log || ''
-    startTimers()
-  }
-})
 
 onBeforeUnmount(stopTimers)
 
@@ -273,186 +495,374 @@ watch(log, scrollLog)
 
 <template>
   <div class="input-layout">
-    <div style="display: flex; flex-direction: column; gap: 16px; min-width: 0">
-      <section class="card">
-        <div class="card-head">
-          <span class="card-title">视角素材</span>
-          <span class="card-note">同一栋楼，最多四张，越多越准</span>
-          <div style="flex: 1" />
-          <span class="badge" :class="{ brand: imageCount > 0 }">{{ imageCount }} / 4</span>
-        </div>
-        <div class="card-pad">
-          <div class="slot-grid">
-            <div
-              v-for="meta in ROLE_META"
-              :key="meta.role"
-              class="slot"
-              :class="{ filled: !!images?.[meta.role], dragover: dragRole === meta.role }"
-              @click="pick(meta.role)"
-              @dragover.prevent="dragRole = meta.role"
-              @dragleave="dragRole = null"
-              @drop.prevent="onDrop(meta.role, $event)"
-            >
-              <template v-if="images?.[meta.role]">
-                <img :src="images[meta.role]!.url" :alt="meta.label" />
-                <div class="slot-shade" />
-                <div class="slot-top">
-                  <span class="slot-role">{{ meta.label }}</span>
-                  <button class="slot-del" title="移除这张" @click.stop="remove(meta.role)">
-                    <UiIcon name="x" :size="12" />
-                  </button>
-                </div>
-                <div class="slot-body">
-                  <div class="slot-name">{{ images[meta.role]!.original || meta.label }}</div>
-                  <div class="slot-hint">点击可替换</div>
-                </div>
-              </template>
-              <template v-else>
-                <div class="slot-empty">
-                  <span class="plus">
-                    <span v-if="uploading === meta.role" class="spinner" />
-                    <UiIcon v-else name="plus" :size="16" />
-                  </span>
-                  <b>{{ meta.label }}<span v-if="meta.required" style="color: var(--danger)"> *</span></b>
-                  <small>{{ meta.hint }}</small>
-                </div>
-              </template>
-            </div>
-          </div>
-          <input ref="fileInput" type="file" accept="image/*" style="display: none" @change="onChange" />
-          <div class="fusion-note">
-            <UiIcon name="info" :size="14" />
-            <span v-if="imageCount > 1">
-              将进行<b>多视角融合</b>：正视定立面，侧视量进深，俯视定平面轮廓与屋顶，自由视角校准色偏。
-            </span>
-            <span v-else>
-              只传正视图也能生成，但进深与平面轮廓只能按宽度估算。补一张侧视图，进深就有着落了。
-            </span>
-          </div>
-        </div>
-      </section>
-
-      <section class="card">
-        <div class="card-head">
-          <span class="card-title">重建参数</span>
-          <span class="card-note">决定模型长什么样</span>
-        </div>
-        <div class="card-pad">
-          <div class="opt-grid">
-            <div class="field">
-              <label class="field-label">重建路线</label>
-              <select v-model="mode" class="select">
-                <option v-for="m in MODES" :key="m.value" :value="m.value">{{ m.label }}</option>
-              </select>
-            </div>
-            <div class="field">
-              <label class="field-label">尺寸预设</label>
-              <select v-model="preset" class="select">
-                <option v-for="p in PRESETS" :key="p.value" :value="p.value">{{ p.label }}</option>
-              </select>
-            </div>
-          </div>
-          <div class="mode-desc" style="margin-top: 8px">{{ currentMode.desc }}</div>
-          <div v-if="multiViewMismatch" class="fusion-note" style="background: var(--warn-soft); border-color: #f6e2bd">
-            <UiIcon name="info" :size="14" />
-            <span>
-              这条路线只用正视图。想用上侧视 / 俯视的进深与轮廓，请切到
-              <b>立面合成</b>。
-            </span>
-          </div>
-
-          <div class="divider" />
-
-          <div v-if="PARAM_SPEC[mode]?.length" class="param-grid">
-            <div v-for="spec in PARAM_SPEC[mode]" :key="spec.key" class="field">
-              <label class="field-label">{{ spec.label }}</label>
-              <input v-model="paramsByMode[mode][spec.key]" class="input" :placeholder="spec.placeholder" />
-              <span v-if="spec.hint" style="font-size: 10.5px; color: var(--faint)">{{ spec.hint }}</span>
-            </div>
-          </div>
-          <div v-else style="font-size: 12px; color: var(--faint)">这条路线没有额外参数，直接生成即可。</div>
-
-          <div class="adv">
-            <div class="adv-head" @click="advanced = !advanced">
-              <span style="display: inline-flex; align-items: center; gap: 6px">
-                <UiIcon name="chevron-down" :size="14" :style="{ transform: advanced ? 'rotate(180deg)' : 'none', transition: '0.2s' }" />
-                高级选项
-              </span>
-              <span style="font-size: 11px; color: var(--faint)">{{ advanced ? '收起' : '色彩与规整强度' }}</span>
-            </div>
-            <div v-if="advanced" class="adv-body">
-              <div class="field">
-                <label class="field-label">饱和度增益</label>
-                <input v-model="adv.sat" class="input" placeholder="1.5" />
-              </div>
-              <div class="field">
-                <label class="field-label">规整强度</label>
-                <select v-model="adv.clean" class="select">
-                  <option value="0">0 · 不规整</option>
-                  <option value="1">1 · 统一窗格</option>
-                  <option value="2">2 · 重排窗阵</option>
-                </select>
-              </div>
-              <div class="field">
-                <label class="field-label">同色合并阈值</label>
-                <input v-model="adv.dedupe" class="input" placeholder="10" />
-              </div>
-              <div class="field">
-                <label class="field-label">中值去噪核</label>
-                <input v-model="adv.median" class="input" placeholder="9" />
-              </div>
-              <label class="check"><input v-model="adv.no_glass" type="checkbox" /> 不自动替换窗户</label>
-              <label class="check"><input v-model="adv.sym" type="checkbox" /> 强制左右对称</label>
-              <label class="check"><input v-model="adv.no_sky" type="checkbox" /> 保留天空（不剥离）</label>
-            </div>
-          </div>
-        </div>
-      </section>
-    </div>
-
-    <aside class="card run-card">
+    <section class="card">
       <div class="card-head">
-        <span class="card-title">生成模型</span>
+        <span class="card-title">视角素材</span>
+        <span class="card-note">同一栋楼，最多四张，越多越准</span>
         <div style="flex: 1" />
-        <span class="badge" :class="{ ok: status === 'done' }">
-          {{ status === 'running' ? '运行中' : status === 'done' ? '已完成' : status === 'failed' ? '失败' : '待开始' }}
-        </span>
+        <span class="badge" :class="{ brand: imageCount > 0 }">{{ imageCount }} / 4</span>
       </div>
-      <div class="card-pad" style="display: flex; flex-direction: column; gap: 12px">
-        <div style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted)">
-          <UiIcon name="layers" :size="14" />
-          将保存为第 {{ modelCount + 1 }} 个模型
-          <div style="flex: 1" />
-          <span v-if="status === 'running'" style="font-family: var(--mono)">{{ elapsed }}s</span>
+      <div class="card-pad">
+        <div class="slot-grid">
+          <div
+            v-for="meta in ROLE_META"
+            :key="meta.role"
+            class="slot"
+            :class="{ filled: !!images?.[meta.role], dragover: dragRole === meta.role }"
+            @click="pick(meta.role)"
+            @dragover.prevent="dragRole = meta.role"
+            @dragleave="dragRole = null"
+            @drop.prevent="onDrop(meta.role, $event)"
+          >
+            <template v-if="images?.[meta.role]">
+              <img :src="images[meta.role]!.url" :alt="meta.label" />
+              <div class="slot-shade" />
+              <div class="slot-top">
+                <span class="slot-role">{{ meta.label }}</span>
+                <button class="slot-del" title="移除这张" @click.stop="remove(meta.role)">
+                  <UiIcon name="x" :size="12" />
+                </button>
+              </div>
+              <div class="slot-body">
+                <div class="slot-name">{{ images[meta.role]!.original || meta.label }}</div>
+                <div class="slot-hint">点击可替换</div>
+              </div>
+            </template>
+            <template v-else>
+              <div class="slot-empty">
+                <span class="plus">
+                  <span v-if="uploading === meta.role" class="spinner" />
+                  <UiIcon v-else name="plus" :size="16" />
+                </span>
+                <b>{{ meta.label }}<span v-if="meta.required" style="color: var(--danger)"> *</span></b>
+                <small>{{ meta.hint }}</small>
+              </div>
+            </template>
+          </div>
         </div>
-
-        <button class="btn primary wide" :disabled="status === 'running' || !images?.front" @click="start">
-          <span v-if="status === 'running'" class="spinner" />
-          <UiIcon v-else name="play" :size="15" />
-          {{ status === 'running' ? '正在生成' : '开始生成' }}
-        </button>
-
-        <div class="progress">
-          <div class="progress-fill" :class="{ done: status === 'done' }" :style="{ width: progress + '%' }" />
+        <input ref="fileInput" type="file" accept="image/*" style="display: none" @change="onChange" />
+        <div class="fusion-note">
+          <UiIcon name="info" :size="14" />
+          <span v-if="imageCount > 1">
+            将进行<b>多视角融合</b>：正视定立面，侧视量进深，俯视定平面轮廓与屋顶，自由视角校准色偏。
+          </span>
+          <span v-else>
+            只传正视图也能生成，但进深与平面轮廓只能按宽度估算。补一张侧视图，进深就有着落了。
+          </span>
+          <span style="color: var(--brand-deep); font-weight: 600">也可以直接 Ctrl+V 粘贴截图。</span>
         </div>
+      </div>
+    </section>
 
-        <div class="run-meta">
-          <span>{{ progress }}%</span>
-          <div style="flex: 1" />
-          <span v-if="imageCount > 1">{{ imageCount }} 视角融合</span>
-          <span v-else>单视角</span>
+    <section class="card">
+      <div class="card-head">
+        <span class="card-title">生成设置</span>
+        <span class="card-note">决定交给 AI 的建筑尺度</span>
+      </div>
+      <div class="card-pad">
+        <div class="opt-grid">
+          <div class="field" style="grid-column: 1 / -1">
+            <label class="field-label" style="display: flex; align-items: center; gap: 8px">
+              尺寸
+              <b style="color: var(--brand-deep); font-variant-numeric: tabular-nums">
+                {{ scale.toFixed(1) }} 格 / 米
+              </b>
+              <span v-if="scaleHint" style="color: var(--faint); font-weight: 400">
+                {{ scaleHint }}
+              </span>
+              <div style="flex: 1" />
+              <button class="btn sm" style="padding: 2px 8px" @click="autoScale">自动</button>
+            </label>
+            <input
+              v-model.number="scale"
+              type="range"
+              :min="SCALE_MIN"
+              :max="SCALE_MAX"
+              step="0.5"
+              class="scale-slider"
+            />
+            <div class="scale-ticks">
+              <span>0.5 袖珍</span><span>2 默认</span><span>8 超精细</span>
+            </div>
+          </div>
+          <div class="field">
+            <label class="field-label">细节等级</label>
+            <select v-model.number="detailLevel" class="select">
+              <option :value="1">基础（小尺寸）</option>
+              <option :value="2">标准</option>
+              <option :value="3">精细（大模型）</option>
+              <option :value="4">观赏性细节（社区级）</option>
+            </select>
+          </div>
+          <div class="field" style="grid-column: 1 / -1">
+            <label class="field-label" style="display: flex; align-items: center; gap: 8px">
+              游戏建筑技巧性
+              <b style="color: var(--brand-deep)">{{ CRAFT_LABEL[craft] }}</b>
+            </label>
+            <input
+              v-model.number="craft"
+              type="range"
+              min="0"
+              max="2"
+              step="1"
+              class="scale-slider"
+            />
+            <div class="scale-ticks">
+              <span>低 · 贴近照片</span><span>中 · 默认</span><span>高 · 社区法则</span>
+            </div>
+            <div class="fusion-note" style="margin-top: 8px">
+              <UiIcon name="info" :size="14" />
+              <span>
+                这一档决定 AI 在"还原照片"和"像社区大神的作品"之间怎么取舍：
+                调高会优先套用三色原则、开口包框、腰线分段、收分这些形式法则，
+                允许改配色和开间节奏；调低则尽量照抄照片的结构与配色。
+                <b>层数、比例尺仍以照片为准</b>，层数需要强制指定时写进「补充要求」。
+              </span>
+            </div>
+          </div>
         </div>
-
-        <div id="run-log" class="log">
-          <template v-if="hasLog">
-            <span v-for="(line, i) in logLines" :key="i" class="log-line" :class="line.cls">{{ line.text }}</span>
-          </template>
-          <span v-else class="log-empty">
-            日志会实时出现在这里。<br />
-            生成过程中会自动跳到「输出结果」。
+        <div v-if="detailLevel >= 4" class="orn-hint">
+          <UiIcon name="spark" :size="13" />
+          <span>
+            在「精细」之上再加一层人味：甲板/屋顶会多出成组的设备箱、天线、救生筒，
+            墙面会补窗下外机、花箱、壁灯，并按原图做材质色差（水线、墙脚返潮、窗下挂污）。
+            小件<b>不左右对称</b>，位置由种子固定，可复现。方块数会明显增加。
+          </span>
+        </div>
+        <div class="fusion-note" style="margin-top: 12px">
+          <UiIcon name="info" :size="14" />
+          <span>
+            比例尺决定模型多大：AI 先判断建筑类型与实际尺寸（米），再用它换算成格数，
+            所以宽高比跟着照片走，不会被拉成长板。它只是偏好，AI 会按建筑常识微调。
           </span>
         </div>
       </div>
-    </aside>
+    </section>
+
+    <section class="card ai-card">
+      <div class="card-head">
+        <span class="card-title">AI 生成</span>
+        <div style="flex: 1" />
+        <span class="badge" :class="{ ok: status === 'done' }">
+          {{ status === 'running' ? `运行中 ${elapsed}s` : status === 'done' ? '已完成' : status === 'failed' ? '失败' : '待开始' }}
+        </span>
+        <span class="badge" :class="{ ok: aiCfg.hasKey }">
+          {{ aiCfg.hasKey ? aiCfg.model : '未配置' }}
+        </span>
+      </div>
+
+      <div class="ai-body">
+        <div class="ai-left">
+          <div class="param-grid">
+            <div class="field">
+              <label class="field-label">接口地址</label>
+              <input v-model="aiCfg.baseUrl" class="input" placeholder="https://api.deepseek.com/v1" />
+            </div>
+            <div class="field">
+              <label class="field-label">模型</label>
+              <input
+                v-model="aiCfg.model"
+                class="input"
+                list="ai-model-list"
+                placeholder="deepseek-flash"
+              />
+              <datalist id="ai-model-list">
+                <option v-for="m in modelList" :key="m" :value="m" />
+              </datalist>
+              <div v-if="modelList.length" class="vision-note">
+                {{
+                  modelList.includes(aiCfg.model)
+                    ? `服务端模型：${modelList.join(' / ')}`
+                    : `服务端列的是 ${modelList.join(' / ')}；${aiCfg.model || '当前写法'} 不在清单里，可能是旧别名`
+                }}
+              </div>
+            </div>
+            <div class="field">
+              <label class="field-label">密钥</label>
+              <input
+                v-model="aiCfg.keyInput"
+                class="input"
+                type="password"
+                :placeholder="aiCfg.hasKey ? aiCfg.keyHint : 'sk-…'"
+              />
+            </div>
+          </div>
+          <div class="field">
+            <label class="field-label">补充要求（可选）</label>
+            <input v-model="aiCfg.hint" class="input" placeholder="比如：三层带车库，屋顶要坡顶" />
+          </div>
+
+          <details class="vision-box" :open="aiCfg.visionOpen" @toggle="aiCfg.visionOpen = ($event.target as any).open">
+            <summary>
+              看图能力
+              <span
+                class="vision-state"
+                :class="{ on: aiCfg.visionOk === true, off: aiCfg.visionOk === false }"
+              >
+                {{ visionStateText }}
+              </span>
+            </summary>
+            <div class="vision-hint">
+              默认就让主模型自己看图 —— <code>deepseek-chat</code> / <code>deepseek-flash</code>
+              都能读图，<code>deepseek-v4-pro</code> 读不了。所以这一栏留空即可；只有想换成通义
+              <code>qwen-vl-max</code>、智谱 <code>glm-4v</code>、豆包、Kimi 之类单独的视觉模型时才需要填。
+              判断方式不是看文档：给模型发一张写着 <code>K7Q</code> 的小图，读得出来才叫能看图。
+            </div>
+            <div class="param-grid">
+              <div class="field">
+                <label class="field-label">接口地址</label>
+                <input v-model="aiCfg.visionBaseUrl" class="input" placeholder="留空则跟随上面的接口地址" />
+              </div>
+              <div class="field">
+                <label class="field-label">视觉模型（留空 = 用主模型）</label>
+                <input
+                  v-model="aiCfg.visionModel"
+                  class="input"
+                  list="ai-model-list"
+                  :placeholder="`当前生效：${aiCfg.visionEffective || aiCfg.model || '—'}`"
+                />
+              </div>
+              <div class="field">
+                <label class="field-label">密钥</label>
+                <input
+                  v-model="aiCfg.visionKeyInput"
+                  class="input"
+                  type="password"
+                  :placeholder="aiCfg.hasVisionKey ? aiCfg.visionKeyHint : '留空则跟随上面的密钥'"
+                />
+              </div>
+            </div>
+            <div class="vision-actions">
+              <button class="btn" :disabled="aiCfg.probing || !aiCfg.hasKey" @click="probeVision">
+                <span v-if="aiCfg.probing" class="spinner" />
+                {{ aiCfg.probing ? '检测中' : '重新检测' }}
+              </button>
+              <span v-if="aiCfg.visionNote" class="vision-note">{{ aiCfg.visionNote }}</span>
+            </div>
+          </details>
+
+          <div style="display: flex; gap: 8px; flex-wrap: wrap">
+            <button class="btn" @click="saveCfg">保存配置</button>
+            <button class="btn" :disabled="aiBusy || !images?.front" @click="makePlan">
+              <span v-if="aiBusy" class="spinner" />
+              {{ aiBusy ? 'AI 思考中' : '让 AI 出方案' }}
+            </button>
+            <button class="btn primary" :disabled="!aiSpec || status === 'running'" @click="buildPlan">
+              {{ status === 'running' ? '正在生成' : '按方案生成' }}
+            </button>
+          </div>
+
+          <div style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted)">
+            <UiIcon name="layers" :size="14" />
+            将保存为第 {{ modelCount + 1 }} 个模型
+            <div style="flex: 1" />
+            <span>{{ progress }}%</span>
+          </div>
+          <div class="progress">
+            <div class="progress-fill" :class="{ done: status === 'done' }" :style="{ width: progress + '%' }" />
+          </div>
+
+          <div v-if="aiError" style="font-size: 11.5px; color: var(--err)">{{ aiError }}</div>
+          <div v-if="aiVision" class="vision-read">
+            <span class="vision-tag">视觉判读</span>
+            {{ aiVision.type || aiVision.subject }}
+            <template v-if="isShipVision">
+              <template v-if="bowLabel"> · 船头朝{{ bowLabel }}</template>
+              <template v-if="aiVision.ship?.superstructure">
+                · 上建在{{ aiVision.ship.superstructure }}
+              </template>
+              <template v-if="aiVision.ship?.deck_items?.length">
+                · {{ aiVision.ship.deck_items.join('、') }}
+              </template>
+            </template>
+            <template v-else>
+              <template v-if="aiVision.floors"> · {{ aiVision.floors }} 层</template>
+              <template v-if="aiVision.bays"> · {{ aiVision.bays }} 开间</template>
+              <template v-if="aiVision.roof?.type && aiVision.roof.type !== 'none'">
+                · 屋顶 {{ aiVision.roof.type }}
+              </template>
+              <template v-if="aiVision.ornaments?.length">
+                · {{ aiVision.ornaments.join('、') }}
+              </template>
+            </template>
+            <template v-if="aiVision.railing?.has"> · 有栏杆</template>
+            <template v-if="aiVision.flagpole?.has"> · 有旗杆</template>
+          </div>
+          <div
+            v-if="aiVision && aiVision.subject !== 'building'"
+            class="vision-warn"
+            :class="{ 'is-ok': isShipVision }"
+          >
+            <template v-if="isShipVision">
+              按舰船语法建模：船长轴沿南北、舰艏在正前方（收窄成尖），甲板栏杆与旗杆按判读位置铺。
+            </template>
+            <template v-else>
+              视觉模型判断主体是「{{ aiVision.subject }}」，不是建筑：模型只能按它的体量近似，
+              没有对应的建筑语汇可用。
+            </template>
+          </div>
+          <div v-if="aiNote" class="vision-warn">{{ aiNote }}</div>
+          <div v-if="aiVisionDiff?.verdict" class="vision-read">
+            <span class="vision-tag alt">看图评价</span>
+            {{ aiVisionDiff.verdict }}<template v-if="aiVisionDiff.score">
+              （{{ aiVisionDiff.score }} 分）</template
+            >
+          </div>
+          <div v-if="aiBrief" style="font-size: 11px; color: var(--faint)">
+            照片分析：体块 {{ aiBrief.massing?.count }} 段 · 窗 {{ aiBrief.windows?.rows }} 排 ×
+            {{ aiBrief.windows?.cols }} 列 · 墙色 {{ aiBrief.palette?.wall }}
+          </div>
+
+          <div id="run-log" class="log">
+            <template v-if="hasLog">
+              <span v-for="(line, i) in logLines" :key="i" class="log-line" :class="line.cls">{{ line.text }}</span>
+            </template>
+            <span v-else class="log-empty">
+              日志会实时出现在这里。<br />
+              生成过程中会自动跳到「查看输出结果」。
+            </span>
+          </div>
+        </div>
+
+        <div class="ai-right">
+          <div class="field">
+            <label class="field-label">
+              蓝图（可直接改）
+              <span v-if="aiSeed" class="seed-badge" :title="'复现码：同一个种子 + 同一份蓝图 = 同一个模型'">
+                <UiIcon name="refresh" :size="11" /> 种子 {{ aiSeed }}
+              </span>
+              <span v-if="aiScore !== null" class="score-badge" :class="{ good: aiScore >= 84 }">
+                体检 {{ aiScore }} 分
+              </span>
+              <span
+                v-if="aiComplete"
+                class="seed-badge"
+                :title="`照片的${aiComplete.cut.map((c) => (c === 'left' ? '左' : '右')).join('、')}边缘被画框切断了，模型按对称补全到 ${aiComplete.ratio} 倍宽`"
+              >
+                <UiIcon name="sparkle" :size="11" /> 已补全 ×{{ aiComplete.ratio }}
+              </span>
+            </label>
+            <textarea
+              v-model="aiSpec"
+              class="spec-editor"
+              spellcheck="false"
+              placeholder="AI 会把蓝图写在这里：volumes / windows / roof / details"
+            />
+            <div v-if="aiRounds.length > 1" class="round-strip">
+              <span
+                v-for="r in aiRounds"
+                :key="r.round"
+                class="round-chip"
+                :class="{ best: r.score === aiScore }"
+                :title="r.issues.slice(0, 3).join('；')"
+              >
+                第 {{ r.round }} 轮 {{ r.score }} 分
+              </span>
+              <span class="round-note">分数低时会自动把问题喂回 AI 再改一版</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
   </div>
 </template>

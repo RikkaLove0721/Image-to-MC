@@ -524,8 +524,24 @@ def main() -> int:
         window.load_url(f"http://127.0.0.1:{port}")
 
         if os.environ.get("MC12_SELFTEST"):
+            def wait_dom(timeout: float = 25.0) -> bool:
+                """等前端真正挂载完再自检。
+
+                原来固定 sleep 6 秒，页面一复杂（0.22 的前端包更大）就会在
+                渲染前取到空 DOM，报告 nodes:24 / footer:false，看着像坏了。
+                """
+                end = time.time() + timeout
+                while time.time() < end:
+                    try:
+                        if window.evaluate_js("!!document.querySelector('.app-footer')"):
+                            return True
+                    except Exception:  # noqa: BLE001
+                        pass
+                    time.sleep(0.4)
+                return False
+
             def check() -> None:
-                time.sleep(6.0)
+                wait_dom()
                 try:
                     info = window.evaluate_js(
                         "JSON.stringify({"

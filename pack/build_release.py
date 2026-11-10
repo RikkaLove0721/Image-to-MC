@@ -71,6 +71,7 @@ def build_core() -> Path:
             "--console",
             "--name", "mc12-core",
             "--collect-submodules", "mc12",
+            "--hidden-import", "mcp_server",
             "--exclude-module", "tkinter",
             "--exclude-module", "matplotlib",
             "--exclude-module", "scipy",
@@ -90,6 +91,33 @@ def build_core() -> Path:
     return target / "mc12-core.exe"
 
 
+def _sync_tree(src: Path, dst: Path) -> None:
+    """把 src 同步到 dst：覆盖同名文件，并删掉 dst 里 src 已经没有的文件。
+
+    不能直接 rmtree 再 copytree：目录上千个文件会触发系统的批量删除保护；
+    而 dirs_exist_ok 只覆盖不删除，删掉的路由会一直留在包里。
+    """
+    dst.mkdir(parents=True, exist_ok=True)
+    keep: set[str] = set()
+    for item in src.rglob("*"):
+        if not item.is_file():
+            continue
+        rel = item.relative_to(src)
+        keep.add(rel.as_posix())
+        target = dst / rel
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(item, target)
+    for item in sorted(dst.rglob("*"), key=lambda p: len(p.parts), reverse=True):
+        rel = item.relative_to(dst).as_posix()
+        if item.is_file() and rel not in keep:
+            item.unlink()
+        elif item.is_dir():
+            try:
+                item.rmdir()
+            except OSError:
+                pass
+
+
 def copy_runtime(node: Path) -> Path:
     print("[2/4] 布置 Web 运行时 ...")
     output = WEB / ".output"
@@ -97,8 +125,8 @@ def copy_runtime(node: Path) -> Path:
         raise SystemExit("web/.output 不存在, 先在 web 目录跑 npm run build")
     runtime = OUT / "runtime"
     runtime.mkdir(parents=True, exist_ok=True)
-    shutil.copytree(output / "server", runtime / "server", dirs_exist_ok=True)
-    shutil.copytree(output / "public", runtime / "public", dirs_exist_ok=True)
+    _sync_tree(output / "server", runtime / "server")
+    _sync_tree(output / "public", runtime / "public")
     shutil.copy2(node, runtime / "node.exe")
     return runtime
 
@@ -161,6 +189,26 @@ README = """MC 工程图 {version}
 多视角
   正视图必传, 侧视 / 俯视 / 自由视角可选, 最多四张.
   侧视图量进深, 俯视图给平面轮廓与屋顶颜色, 自由视角只用来校白平衡.
+
+装饰与体块(高级选项里)
+  装饰替代: 先把画面分成树冠 / 草坪 / 建筑 / 栅栏区, 确认不是建筑才换成
+            树叶与栅栏, 楼顶和墙面不会被误判.
+  体块组合: 屋顶线有台阶时, 较矮的一段当作缩进去的侧翼, 平面成 L 形或 T 形.
+  屋顶收头: 默认沿屋顶线压一圈女儿墙; 双坡 / 四坡要自己选, 单张正面照
+            分不清山墙和坡面, 所以不自动选.
+  宽窗分格: 超过 3 格宽的玻璃带会切开留窗棂, 不再是一整片.
+  室内楼板: 可选, 开了进屋有楼层, 但方块数会明显增加.
+
+方块库范围与自定义
+  本软件以 Minecraft Java 1.12.2 的方块体系(数字 ID + metadata)为准,
+  只收录了建筑常用的 177 种方块 —— 它是子集, 不是 1.12.2 的全部方块.
+  1.13 以后新增的方块(深板岩 / 方解石 / 凝灰岩 / 玄武岩 / 黑石 / 铜块 /
+  樱花木等)这里没有, 提示词里写了也会兜底成石头.
+  需要别的版本或想加方块:
+    改 mc12/palette.py 的 _rows() 增加 (id, meta, 英文名, 中文名, 颜色) 行,
+    再跑 tools/export_library.py 刷新界面的方块库. 其余代码不用动.
+  导出的 .schematic 是经典格式, 只有 1.12.2 及更早版本能直接读;
+  1.13+ 需要先用 WorldEdit 之类的工具转换.
 
 常见问题
   1. 双击没反应: 看看是不是被杀毒软件拦了, 把整个文件夹加白名单.

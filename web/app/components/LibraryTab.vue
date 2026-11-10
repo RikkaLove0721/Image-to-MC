@@ -1,175 +1,391 @@
 <script setup lang="ts">
-const props = defineProps<{ models: any[] }>()
+/**
+ * 仓库内容 = 这个项目的所有输出结果。
+ *
+ * 每个输出是一个选项卡, 选项卡的预览图就是模型图; 点开之后能看到
+ * 这一次输出到底按什么设定跑的 —— 尤其是 AI 蓝图 —— 以及三份产物下载。
+ */
+const props = defineProps<{ projectId: string; models: any[] }>()
+const emit = defineEmits<{
+  toast: [msg: string, type?: 'ok' | 'err']
+  openResult: [name: string]
+  refresh: []
+}>()
 
-interface Block {
-  id: number
-  meta: number
-  oldId: string
-  nameEn: string
-  nameZh: string
-  hex: string
-  rgb: [number, number, number]
-  rough: boolean
-  semantic: boolean
-  category: string
-}
+const isDesktop = useDesktopMode()
 
-const { data } = await useAsyncData('library-data', () => $fetch<any>('/api/library'))
-const blocks = computed<Block[]>(() => data.value?.blocks || [])
-const categories = computed<string[]>(() => data.value?.categories || [])
+const activeName = ref<string | null>(null)
 
-const keyword = ref('')
-const category = ref('全部')
-const paintOnly = ref(false)
-const selected = ref<Block | null>(null)
-
-const usage = computed(() => {
-  const map = new Map<string, number>()
-  for (const model of props.models) {
-    for (const block of model.blocks || []) {
-      const key = `${block.id}:${block.meta}`
-      map.set(key, (map.get(key) || 0) + (block.count || 0))
-    }
-  }
-  return map
-})
-
-const filtered = computed(() => {
-  const q = keyword.value.trim().toLowerCase()
-  return blocks.value.filter((block) => {
-    if (paintOnly.value && block.semantic) return false
-    if (category.value !== '全部' && block.category !== category.value) return false
-    if (!q) return true
-    return (
-      block.nameZh.includes(q) ||
-      block.nameEn.toLowerCase().includes(q) ||
-      block.oldId.includes(q) ||
-      block.hex.toLowerCase().includes(q)
-    )
-  })
-})
+const current = computed(
+  () => props.models.find((m) => m.name === activeName.value) || props.models[0] || null,
+)
 
 watch(
-  filtered,
+  () => props.models,
   (list) => {
-    if (!selected.value || !list.some((b) => b.id === selected.value!.id && b.meta === selected.value!.meta)) {
-      selected.value = list[0] || null
+    if (!list.length) {
+      activeName.value = null
+      return
     }
+    if (!list.some((m) => m.name === activeName.value)) activeName.value = list[0].name
   },
   { immediate: true },
 )
 
-function pick(block: Block) {
-  selected.value = block
-}
+const spec = computed<any>(() => current.value?.manifest?.spec || null)
+const specText = computed(() => (spec.value ? JSON.stringify(spec.value, null, 2) : ''))
 
-function textOn(rgb: [number, number, number]) {
-  const lum = (0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]) / 255
-  return lum > 0.62 ? 'rgba(16,24,38,.62)' : 'rgba(255,255,255,.82)'
+const CLEAN_LABEL: Record<string, string> = { '0': '不规整', '1': '统一窗格', '2': '重排窗阵' }
+const DECOR_LABEL: Record<string, string> = {
+  off: '关闭',
+  scene: '非建筑区域（树叶 / 栅栏）',
+  all: '非建筑区域 + 书架',
 }
+const MASSING_LABEL: Record<string, string> = { auto: '自动（屋顶台阶分块）', off: '单一体块' }
+const ROOF_LABEL: Record<string, string> = {
+  auto: '平顶压边',
+  off: '不加工',
+  flat: '平顶压边',
+  gable: '双坡屋面',
+  hip: '四坡屋面',
+}
+const MULLION_LABEL: Record<string, string> = { auto: '超过 3 格自动分格', off: '整片玻璃' }
+const DETAIL_LABEL: Record<number, string> = { 1: '基础', 2: '标准', 3: '精细' }
 
-const usedBy = computed(() => {
-  if (!selected.value) return []
-  const key = `${selected.value.id}:${selected.value.meta}`
-  return props.models
-    .map((model) => {
-      const hit = (model.blocks || []).find((b: any) => `${b.id}:${b.meta}` === key)
-      return hit ? { name: model.name, count: hit.count } : null
+/** 本次设定：只列真的用到的项, 让一屏能看完 */
+const settings = computed<{ key: string; label: string; value: string }[]>(() => {
+  const m = current.value
+  if (!m) return []
+  const p = m.manifest?.params || {}
+  // 老版本（0.15 及以前）的清单没有 settings，退回 params 里的同名/近似字段
+  const s = p.settings || p
+  const rows: { key: string; label: string; value: string }[] = []
+
+  rows.push({ key: 'mode', label: '生成方式', value: modeLabel(m.mode) })
+  if (m.mode === 'spec') {
+    const sp = m.manifest?.spec || {}
+    const lv = Number(sp.detail || 1)
+    // 建筑判断 + 比例尺：这两个决定了模型为什么是现在这个大小
+    const bld = sp.building
+    if (bld?.meters?.length === 3) {
+      const [wall, wh, wd] = bld.meters.map(Number)
+      const raw = Array.isArray(bld.raw) && bld.raw.length === 3 ? bld.raw.map(Number) : null
+      rows.push({
+        key: 'building',
+        label: '建筑判断',
+        value:
+          `${bld.type || '建筑'} ${wall}×${wh}×${wd} 米` +
+          (raw ? `（AI 原估 ${raw[0]}×${raw[1]}×${raw[2]}，按层数修正）` : ''),
+      })
+      if (sp.target_width && wall > 0) {
+        rows.push({
+          key: 'scale',
+          label: '比例尺',
+          value: `${(sp.target_width / wall).toFixed(1)} 格/米`,
+        })
+      }
+    }
+    rows.push({ key: 'detail', label: '细节等级', value: DETAIL_LABEL[lv] || String(lv) })
+    rows.push({ key: 'volumes', label: '体块', value: `${p.volumes ?? '-'} 个` })
+    rows.push({ key: 'roof', label: '屋顶', value: ROOF_LABEL[p.roof] || p.roof || '-' })
+    rows.push({ key: 'details', label: '细节构件', value: `${p.detail_blocks ?? 0} 块` })
+  } else {
+    if (s.preset) rows.push({ key: 'preset', label: '尺寸预设', value: String(s.preset) })
+    if (s.depth) rows.push({ key: 'depth', label: '进深', value: `${s.depth} 格` })
+    if (s.clean !== undefined) {
+      rows.push({ key: 'clean', label: '规整强度', value: CLEAN_LABEL[String(s.clean)] || String(s.clean) })
+    }
+    if (s.decor) rows.push({ key: 'decor', label: '装饰替代', value: DECOR_LABEL[s.decor] || s.decor })
+    if (s.massing) rows.push({ key: 'massing', label: '体块组合', value: MASSING_LABEL[s.massing] || s.massing })
+    if (s.roof) rows.push({ key: 'roof', label: '屋顶收头', value: ROOF_LABEL[s.roof] || s.roof })
+    if (s.roof === 'gable' || s.roof === 'hip') {
+      rows.push({ key: 'roof_height', label: '屋面高度', value: `${s.roof_height || 3} 格` })
+    }
+    if (s.interior === 'on') rows.push({ key: 'interior', label: '室内楼板', value: '已铺' })
+    if (s.sym) rows.push({ key: 'sym', label: '左右对称', value: '强制' })
+    if (s.views) rows.push({ key: 'views', label: '参与视角', value: `${s.views} 张` })
+  }
+  // token 花费：只有走过 AI 方案的才有；直接按蓝图生成的显示"—"
+  const tk = p.tokens
+  if (tk) {
+    const total = Number(tk.total || 0)
+    rows.push({
+      key: 'tokens',
+      label: 'Token 花费',
+      value: total
+        ? `${formatNumber(total)}（输入 ${formatNumber(tk.prompt || 0)} / 输出 ${formatNumber(tk.completion || 0)}）`
+        : '未统计',
     })
-    .filter(Boolean) as { name: string; count: number }[]
+  }
+  if (p.parent) rows.push({ key: 'parent', label: '基于', value: String(p.parent) })
+  return rows
 })
+
+async function onDownload(event: MouseEvent, url?: string) {
+  if (!url || !isDesktop.value) return
+  event.preventDefault()
+  const name = filenameOf(url)
+  const full = `${url}${url.includes('?') ? '&' : '?'}download=1`
+  const state = await desktopSave(full, name)
+  if (state === 'saved') emit('toast', `已保存 ${name}`, 'ok')
+  else if (state === 'failed') emit('toast', '保存失败, 换个位置再试', 'err')
+}
+
+async function copySpec() {
+  if (!specText.value) return
+  try {
+    await navigator.clipboard.writeText(specText.value)
+    emit('toast', '蓝图已复制')
+  } catch {
+    emit('toast', '浏览器不让写剪贴板，手动选中复制吧', 'err')
+  }
+}
+
+const deleting = ref(false)
+
+/* ---------------- 修改：带上下文重新生成 ---------------- */
+const reviseOpen = ref(false)
+const reviseText = ref('')
+const revising = ref(false)
+const reviseNote = ref('')
+
+function openRevise() {
+  reviseText.value = ''
+  reviseNote.value = ''
+  reviseOpen.value = true
+}
+
+async function submitRevise() {
+  const m = current.value
+  if (!m || revising.value) return
+  const fb = reviseText.value.trim()
+  if (!fb) {
+    emit('toast', '先说一句哪里不满意', 'err')
+    return
+  }
+  revising.value = true
+  reviseNote.value = '正在按你的意见改蓝图…'
+  try {
+    const res = await $fetch<any>(`/api/projects/${props.projectId}/ai/revise`, {
+      method: 'POST',
+      body: { model: m.name, feedback: fb },
+    })
+    const jobId = res?.job?.id
+    const mk = res?.job?.modelName || ''
+    reviseNote.value = `已生成蓝图，正在建模（${mk}）…`
+    await pollRevise(jobId)
+    reviseOpen.value = false
+    revising.value = false
+    emit('toast', `已生成 ${mk}，可在仓库里继续改`, 'ok')
+    emit('refresh')
+  } catch (err: any) {
+    revising.value = false
+    reviseNote.value = ''
+    emit('toast', err?.data?.statusMessage || '修改失败', 'err')
+  }
+}
+
+/** 等这次构建跑完再刷新仓库，否则列表里还看不到新模型 */
+async function pollRevise(jobId: string) {
+  if (!jobId) return
+  for (let i = 0; i < 600; i++) {
+    await new Promise((r) => setTimeout(r, 700))
+    try {
+      const st = await $fetch<any>(`/api/projects/${props.projectId}/jobs/${jobId}`)
+      if (st?.status === 'running') continue
+      if (st?.status === 'failed') throw new Error((st?.log || '').slice(-200) || '建模失败')
+      return
+    } catch (e: any) {
+      if (String(e?.message || '').includes('建模失败')) throw e
+    }
+  }
+}
+
+/** 删掉一次输出：产物文件、蓝图、清单一起删，不可撤销。 */
+async function removeModel() {
+  const m = current.value
+  if (!m || deleting.value) return
+  const ok = window.confirm(
+    `删除「${m.name}」？\n\n` +
+      `这会一并删掉它的 .schematic、等轴测图、方块清单、逐层图和 AI 蓝图，\n` +
+      `文件直接从磁盘移除，无法撤销。`,
+  )
+  if (!ok) return
+  deleting.value = true
+  try {
+    const res = await $fetch<{ removed: string[] }>(
+      `/api/projects/${props.projectId}/models/${encodeURIComponent(m.name)}`,
+      { method: 'DELETE' },
+    )
+    emit('toast', `已删除 ${m.name}（${res.removed?.length || 0} 个文件）`, 'ok')
+    activeName.value = null
+    emit('refresh')
+  } catch (err: any) {
+    emit('toast', err?.data?.statusMessage || '删除失败', 'err')
+  } finally {
+    deleting.value = false
+  }
+}
 </script>
 
 <template>
-  <div class="lib-layout">
-    <section class="card" style="min-width: 0">
-      <div class="card-head">
-        <span class="card-title">方块仓库</span>
-        <span class="card-note">Minecraft Java 1.12.2 · 数字 ID 体系</span>
-        <div style="flex: 1" />
-        <span class="badge">{{ filtered.length }} / {{ blocks.length }}</span>
-      </div>
-      <div class="card-pad">
-        <div class="lib-bar">
-          <div class="search">
-            <UiIcon name="search" :size="15" />
-            <input v-model="keyword" class="input" placeholder="搜中文名、英文 id、数字 ID 或色值" />
+  <div v-if="!models.length" class="empty" style="padding: 70px 20px">
+    <strong>仓库里还没有东西</strong>
+    每生成一次模型，这里就多一个选项卡。选项卡上是模型图，点开能回看当时的设定、AI 蓝图和产物下载。
+  </div>
+
+  <div v-else class="repo">
+    <!-- 每个输出结果一个选项卡，预览图就是模型图 -->
+    <div class="repo-tabs">
+      <button
+        v-for="model in models"
+        :key="model.name"
+        class="repo-tab"
+        :class="{ active: current?.name === model.name }"
+        @click="activeName = model.name"
+      >
+        <span class="repo-thumb">
+          <img v-if="model.urls?.iso" :src="model.urls.iso" :alt="model.name" loading="lazy" />
+          <UiIcon v-else name="box" :size="18" />
+        </span>
+        <span class="repo-tab-text">
+          <b>{{ model.name }}</b>
+          <small>
+            {{ model.manifest?.params?.revLabel || modeLabel(model.mode) }} ·
+            {{ formatNumber(model.total) }} 块
+          </small>
+        </span>
+      </button>
+    </div>
+
+    <section v-if="current" class="card repo-detail">
+      <div class="detail-head">
+        <div style="min-width: 0">
+          <div class="detail-title">{{ current.name }}</div>
+          <div style="font-size: 11.5px; color: var(--faint); margin-top: 3px">
+            {{ modeLabel(current.mode) }} · {{ formatDateTime(current.createdAt) }} ·
+            {{ sizeText(current.size) }} · {{ formatNumber(current.total) }} 块 / {{ current.kinds }} 种
           </div>
-          <label class="check"><input v-model="paintOnly" type="checkbox" /> 只看可配色</label>
         </div>
-        <div class="chips" style="margin-bottom: 12px">
-          <button class="chip" :class="{ active: category === '全部' }" @click="category = '全部'">全部</button>
-          <button
-            v-for="cat in categories"
-            :key="cat"
-            class="chip"
-            :class="{ active: category === cat }"
-            @click="category = cat"
-          >
-            {{ cat }}
-          </button>
+        <div style="flex: 1" />
+        <button class="btn sm" @click="emit('openResult', current.name)">
+          <UiIcon name="image" :size="13" /> 在查看结果里打开
+        </button>
+        <button class="btn sm" :disabled="!current.urls?.spec" @click="openRevise">
+          <UiIcon name="spark" :size="13" /> 修改
+        </button>
+        <button class="btn sm danger" :disabled="deleting" @click="removeModel">
+          <UiIcon name="trash" :size="13" /> {{ deleting ? '删除中' : '删除' }}
+        </button>
+      </div>
+
+      <div class="repo-body">
+        <div class="repo-preview">
+          <img v-if="current.urls?.iso" :src="current.urls.iso" :alt="current.name" />
+          <div v-else class="stage-empty">这个模型没有等轴测预览图</div>
         </div>
 
-        <div v-if="!filtered.length" class="empty">没有匹配的方块，换个关键字试试。</div>
-        <div v-else class="lib-grid">
-          <button
-            v-for="block in filtered"
-            :key="`${block.id}:${block.meta}`"
-            class="sw-cell"
-            :class="{ active: selected?.id === block.id && selected?.meta === block.meta }"
-            @click="pick(block)"
-          >
-            <div class="sw-color" :style="{ background: block.hex, color: textOn(block.rgb) }">
-              {{ block.oldId }}
+        <div class="repo-side">
+          <div class="repo-block">
+            <div class="repo-block-head">本次设定</div>
+            <dl class="kv">
+              <template v-for="row in settings" :key="row.key">
+                <dt>{{ row.label }}</dt>
+                <dd>{{ row.value }}</dd>
+              </template>
+            </dl>
+          </div>
+
+          <div class="repo-block">
+            <div class="repo-block-head">下载</div>
+            <div class="dl-list">
+              <a
+                v-if="current.urls?.schematic"
+                class="btn sm wide"
+                :href="current.urls.schematic + '?download=1'"
+                @click="onDownload($event, current.urls.schematic)"
+              >
+                <UiIcon name="download" :size="13" /> 方块模型 .schematic
+              </a>
+              <a
+                v-if="current.urls?.blocks"
+                class="btn sm wide"
+                :href="current.urls.blocks + '?download=1'"
+                @click="onDownload($event, current.urls.blocks)"
+              >
+                <UiIcon name="download" :size="13" /> 方块数量清单 .txt
+              </a>
+              <a
+                v-if="current.urls?.layers"
+                class="btn sm wide"
+                :href="current.urls.layers + '?download=1'"
+                @click="onDownload($event, current.urls.layers)"
+              >
+                <UiIcon name="download" :size="13" /> 逐层平面图 .txt
+              </a>
+              <a
+                v-if="current.urls?.spec"
+                class="btn sm wide"
+                :href="current.urls.spec + '?download=1'"
+                @click="onDownload($event, current.urls.spec)"
+              >
+                <UiIcon name="download" :size="13" /> AI 蓝图 .json
+              </a>
             </div>
-            <div class="sw-name">{{ block.nameZh }}</div>
-            <div class="sw-id">{{ block.hex }}</div>
-          </button>
+            <div v-if="!current.urls?.spec" style="font-size: 11px; color: var(--faint); margin-top: 8px">
+              这个模型是照片直转的，没有 AI 蓝图。
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="repo-spec" v-if="spec">
+        <div class="section-head" style="margin-bottom: 8px">
+          <span class="section-title" style="font-size: 13.5px">输出时的 AI 蓝图</span>
+          <span class="section-count">
+            {{ spec.volumes?.length || 0 }} 个体块 · {{ spec.windows?.length || 0 }} 组窗阵 ·
+            {{ spec.details?.length || 0 }} 处细节
+          </span>
+          <div class="section-line" />
+          <button class="btn sm ghost" @click="copySpec">复制</button>
+        </div>
+        <pre class="spec-pre">{{ specText }}</pre>
+        <div class="spec-note">
+          蓝图可以直接改完再生成：
+          <code>{{ current.name }}_spec.json</code> 放在项目目录，用
+          <code>run.py --spec</code> 重建，或者贴回生成页的蓝图框。
         </div>
       </div>
     </section>
 
-    <aside v-if="selected" class="card lib-detail">
-      <div class="lib-swatch" :style="{ background: selected.hex }">
-        <span>{{ selected.hex }}</span>
+    <AppModal
+      :open="reviseOpen"
+      title="修改这一版"
+      desc="AI 会带着上一版的分析过程和蓝图来改，比例、层数、种子都不动"
+      width="520px"
+      @close="revising ? null : (reviseOpen = false)"
+    >
+      <div style="font-size: 12.5px; color: var(--muted); margin-bottom: 8px">
+        基于 <b>{{ current?.name }}</b>。说清楚哪里不满意就行，例如：
+        <i>二层窗户太多、招牌太小、右侧太空、入口想要台阶</i>。
       </div>
-      <div class="card-pad">
-        <div style="font-size: 16px; font-weight: 800">{{ selected.nameZh }}</div>
-        <div style="font-size: 11.5px; color: var(--faint); font-family: var(--mono); margin-bottom: 12px">
-          {{ selected.nameEn }}
-        </div>
-
-        <dl class="kv">
-          <dt>数字 ID</dt>
-          <dd style="font-family: var(--mono)">{{ selected.oldId }}</dd>
-          <dt>RGB</dt>
-          <dd style="font-family: var(--mono)">{{ selected.rgb.join(', ') }}</dd>
-          <dt>分类</dt>
-          <dd>{{ selected.category }}</dd>
-          <dt>纹理</dt>
-          <dd>{{ selected.rough ? '有颗粒 / 花纹' : '平整纯色' }}</dd>
-          <dt>用途</dt>
-          <dd>{{ selected.semantic ? '语义方块，只由窗户 / 水 / 灯光规则使用' : '可参与颜色匹配' }}</dd>
-          <dt>本项目</dt>
-          <dd>
-            <b>{{ formatNumber(usage.get(selected.oldId) || 0) }}</b> 块
-          </dd>
-        </dl>
-
-        <div v-if="usedBy.length" style="margin-top: 14px; border-top: 1px dashed var(--line); padding-top: 10px">
-          <div style="font-size: 11px; color: var(--faint); margin-bottom: 6px">出现在这些模型里</div>
-          <div v-for="item in usedBy" :key="item.name" style="display: flex; font-size: 12px; gap: 8px; padding: 2px 0">
-            <span style="color: var(--muted)">{{ item.name }}</span>
-            <span style="flex: 1" />
-            <span>{{ formatNumber(item.count) }} 块</span>
-          </div>
-        </div>
-
-        <div class="fusion-note" style="margin-top: 14px">
-          <UiIcon name="info" :size="14" />
-          <span>1.12.2 用「id:meta」定位方块，换成 1.13+ 的字符串 ID 会导致导入失败。</span>
-        </div>
+      <textarea
+        v-model="reviseText"
+        class="input"
+        rows="5"
+        style="resize: vertical; font-family: inherit; line-height: 1.6"
+        placeholder="这一版哪里不对？想改成什么样？"
+        :disabled="revising"
+      />
+      <div v-if="reviseNote" style="font-size: 12px; color: var(--brand-deep); margin-top: 8px">
+        {{ reviseNote }}
       </div>
-    </aside>
+      <template #foot>
+        <button class="btn sm ghost" :disabled="revising" @click="reviseOpen = false">取消</button>
+        <button class="btn sm primary" :disabled="revising" @click="submitRevise">
+          <UiIcon name="spark" :size="13" /> {{ revising ? '生成中…' : '生成修改版' }}
+        </button>
+      </template>
+    </AppModal>
   </div>
 </template>

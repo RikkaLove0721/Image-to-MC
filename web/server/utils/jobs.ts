@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
-import { coreCommand, projectDir, rootDir, type Project, type ViewRole } from './store'
+import { coreCommand, projectDir, rootDir, type Project } from './store'
 
 export interface JobState {
   id: string
@@ -19,56 +19,18 @@ export interface JobState {
 const jobs = new Map<string, JobState>()
 const MAX_LOG = 400_000
 
-const MODES = ['synth', 'building', 'hall', 'relief', 'flat', 'terrain']
-const PRESETS = ['xs', 's', 'm', 'l', 'xl']
-const NUMERIC = [
-  'width', 'depth', 'floors', 'length', 'height', 'bays', 'cell',
-  'sat', 'k', 'clean', 'dedupe', 'median', 'strength',
-]
-
-function clampNum(key: string, value: unknown): string | null {
-  const n = Number(value)
-  if (!Number.isFinite(n)) return null
-  if (key === 'sat') return String(Math.min(3, Math.max(0.5, n)))
-  if (key === 'clean') return String(Math.min(2, Math.max(0, Math.round(n))))
-  if (key === 'dedupe') return String(Math.min(40, Math.max(0, n)))
-  if (key === 'median') return String(Math.min(31, Math.max(0, Math.round(n))))
-  if (key === 'strength') return String(Math.min(20, Math.max(0.5, n)))
-  return String(Math.max(0, Math.round(n)))
-}
-
+/** 构建只认蓝图：0.17.0 起照片直转路线已删除 */
 export function buildArgs(project: Project, options: Record<string, any>): string[] {
-  const front = project.images.front
-  if (!front) {
-    throw createError({ statusCode: 400, statusMessage: '还没有上传正视图' })
+  if (!options.spec) {
+    throw createError({ statusCode: 400, statusMessage: '缺少蓝图：现在只支持按蓝图生成' })
   }
-  const mode = MODES.includes(options.mode) ? String(options.mode) : 'synth'
-  const preset = PRESETS.includes(options.preset) ? String(options.preset) : 'm'
   const outDir = path.join(projectDir(project.id), 'output')
   fs.mkdirSync(outDir, { recursive: true })
-
-  const args = [
-    '-i', path.join(projectDir(project.id), 'images', front.file),
+  return [
+    '--spec', String(options.spec),
     '-o', outDir,
-    '--name', String(options.name),
-    '--mode', mode,
-    '--preset', preset,
+    '--name', String(options.name || 'spec'),
   ]
-  for (const role of ['side', 'top', 'free'] as ViewRole[]) {
-    const image = project.images[role]
-    if (image) {
-      args.push('--view', `${role}=${path.join(projectDir(project.id), 'images', image.file)}`)
-    }
-  }
-  for (const key of NUMERIC) {
-    if (options[key] === undefined || options[key] === null || options[key] === '') continue
-    const value = clampNum(key, options[key])
-    if (value !== null) args.push(`--${key}`, value)
-  }
-  for (const flag of ['no_glass', 'no_sky', 'no_rect', 'no_flat', 'sym']) {
-    if (options[flag]) args.push(`--${flag.replace(/_/g, '-')}`)
-  }
-  return args
 }
 
 export function startJob(project: Project, modelName: string, options: Record<string, any>): JobState {
@@ -124,8 +86,47 @@ export function startJob(project: Project, modelName: string, options: Record<st
     job.code = code
     job.status = code === 0 ? 'done' : 'failed'
     job.finishedAt = new Date().toISOString()
+    if (code === 0) applyAiMeta(project, modelName, options.meta)
   })
   return job
+}
+
+/**
+ * 把"这次花了多少 token / 怎么分析出来的"写进仓库。
+ *
+ * 构建进程（Python）只认蓝图，不知道 AI 花了多少钱，所以这两样由 Node 侧
+ * 回填：清单的 params 里存一个精简摘要（界面上要显示），另外落一份
+ * `<model>_ai.json` 存完整分析过程 —— 仓库页「修改」要拿它当上下文。
+ */
+function applyAiMeta(project: Project, modelName: string, meta: any): void {
+  if (!meta) return
+  const outDir = path.join(projectDir(project.id), 'output')
+  const manifestPath = path.join(outDir, `${modelName}_manifest.json`)
+  try {
+    const m = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'))
+    m.params = {
+      ...(m.params || {}),
+      tokens: meta.usage || null,
+      craft: meta.craft ?? null,
+      hint: meta.hint ?? null,
+      parent: meta.parent || null,
+      revLabel: meta.revLabel || null,
+    }
+    fs.writeFileSync(manifestPath, JSON.stringify(m, null, 2), 'utf-8')
+  } catch {
+    /* 清单还没写出来就不管：界面顶多少一行 token */
+  }
+  if (meta.analysis) {
+    try {
+      fs.writeFileSync(
+        path.join(outDir, `${modelName}_ai.json`),
+        JSON.stringify(meta.analysis, null, 2),
+        'utf-8',
+      )
+    } catch {
+      /* 分析过程存不下不影响模型本身 */
+    }
+  }
 }
 
 export function getJob(id: string): JobState | undefined {

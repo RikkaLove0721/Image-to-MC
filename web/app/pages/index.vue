@@ -10,12 +10,14 @@ interface ProjectRow {
 }
 
 const version = useRuntimeConfig().public.version as string
+/** 使用说明弹窗 */
+const helpOpen = ref(false)
 
 const { data, pending, refresh, error } = await useAsyncData('projects', () =>
   $fetch<{ projects: ProjectRow[] }>('/api/projects'),
 )
 const { data: library } = await useAsyncData('library', () =>
-  $fetch<{ total: number }>('/api/library'),
+  $fetch<{ total: number; blocks: any[]; categories: string[] }>('/api/library'),
 )
 const { data: watchInfo } = await useAsyncData('watch', () =>
   $fetch<{ signature: string; dir: string; core: { bin: string } }>('/api/watch'),
@@ -23,6 +25,11 @@ const { data: watchInfo } = await useAsyncData('watch', () =>
 
 const projects = computed<ProjectRow[]>(() => data.value?.projects || [])
 const modelTotal = computed(() => projects.value.reduce((sum, p) => sum + (p.modelCount || 0), 0))
+
+/* ---- 方块库：全局的, 跟项目无关, 所以放在母页面 ---- */
+
+const showBlocks = ref(false)
+const blockPreview = computed<any[]>(() => (library.value?.blocks || []).slice(0, 26))
 
 /* ---- 与磁盘上的项目文件夹保持同步 ---- */
 
@@ -203,6 +210,9 @@ function openProject(project: ProjectRow) {
         <div class="topbar-spacer" />
         <span class="badge">v{{ version }}</span>
         <span class="badge brand">Java 1.12.2</span>
+        <button class="btn" @click="helpOpen = true">
+          <UiIcon name="info" :size="15" /> 使用说明
+        </button>
         <button class="btn primary" @click="openCreate">
           <UiIcon name="plus" :size="16" /> 新建项目
         </button>
@@ -224,6 +234,9 @@ function openProject(project: ProjectRow) {
           <div class="hero-actions">
             <button class="btn primary" @click="openCreate">
               <UiIcon name="plus" :size="16" /> 新建项目
+            </button>
+            <button class="btn ghost" @click="helpOpen = true">
+              <UiIcon name="info" :size="16" /> 第一次用？看说明
             </button>
             <a class="btn ghost" href="#projects">
               <UiIcon name="folder" :size="16" /> 已有项目 {{ projects.length }}
@@ -338,6 +351,40 @@ function openProject(project: ProjectRow) {
         </div>
       </section>
 
+      <section id="blocks">
+        <div class="section-head">
+          <h2 class="section-title">方块库</h2>
+          <span class="section-count">{{ library?.total || 0 }} 种 · Java 1.12.2 数字 ID 体系</span>
+          <div class="section-line" />
+          <div class="section-tools">
+            <button class="btn sm ghost" @click="showBlocks = !showBlocks">
+              <UiIcon :name="showBlocks ? 'chevron-down' : 'grid'" :size="13" />
+              {{ showBlocks ? '收起' : '展开浏览' }}
+            </button>
+          </div>
+        </div>
+
+        <BlockLibrary v-if="showBlocks" />
+        <div v-else class="blocks-teaser" @click="showBlocks = true">
+          <div class="teaser-swatches">
+            <span
+              v-for="block in blockPreview"
+              :key="`${block.id}:${block.meta}`"
+              class="teaser-sw"
+              :style="{ background: block.hex }"
+              :title="`${block.nameZh} ${block.oldId}`"
+            />
+          </div>
+          <div class="teaser-text">
+            <b>点开看全部 {{ library?.total || 0 }} 种</b>
+            <span>
+              混凝土 / 羊毛 / 陶瓦 / 木材 / 石材 / 玻璃与光 / 装饰 —— 都能按颜色匹配，
+              也可以查数字 ID 与色值。
+            </span>
+          </div>
+        </div>
+      </section>
+
       <AppFooter />
     </main>
 
@@ -390,6 +437,8 @@ function openProject(project: ProjectRow) {
         <button class="btn primary" :disabled="renameBusy" @click="submitRename">保存</button>
       </template>
     </AppModal>
+
+    <HelpDialog :open="helpOpen" @close="helpOpen = false" />
 
     <Transition name="fade">
       <div v-if="toast" class="toast" :class="{ err: toast.type === 'err' }">

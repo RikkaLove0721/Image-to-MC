@@ -274,6 +274,7 @@ export function scanModels(project: Project): ModelSummary[] {
       add('_view.html', 'view', '浏览器 3D 查看器', 'html')
       add('_blocks.txt', 'blocks', '方块数量清单', 'text')
       add('_layers.txt', 'layers', '逐层平面图', 'text')
+      add('_spec.json', 'spec', 'AI 蓝图', 'text')
 
       const created = fs.statSync(full).mtime.toISOString()
       out.push({
@@ -294,6 +295,37 @@ export function scanModels(project: Project): ModelSummary[] {
   }
   out.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
   return out
+}
+
+/** 删除一个模型的所有产物（模型名不能带路径）。 */
+export function deleteModel(project: Project, name: string): { removed: string[] } {
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(name)) {
+    throw createError({ statusCode: 400, statusMessage: '模型名不合法' })
+  }
+  const dir = path.join(projectDir(project.id), 'output')
+  if (!fs.existsSync(dir)) {
+    throw createError({ statusCode: 404, statusMessage: '这个项目还没有输出' })
+  }
+  const removed: string[] = []
+  // 修改版（m11_r2）是独立模型，删 m11 时不能连带删掉它
+  const revPrefix = new RegExp(`^${name}_r\\d+`)
+  for (const entry of fs.readdirSync(dir)) {
+    if (revPrefix.test(entry)) continue
+    // m01.schematic / m01_iso.png / m01_manifest.json 都归 m01；
+    // 用 "m01_"/"m01." 精确前缀，才不会把 m010 一起删掉
+    if (entry === `${name}.schematic` || entry.startsWith(`${name}_`) || entry.startsWith(`${name}.`)) {
+      fs.rmSync(path.join(dir, entry), { force: true })
+      removed.push(entry)
+    }
+  }
+  if (!removed.length) {
+    throw createError({ statusCode: 404, statusMessage: '找不到这个模型' })
+  }
+  if (project.lastModel === name) {
+    delete project.lastModel
+    saveProject(project)
+  }
+  return { removed }
 }
 
 export function projectDetail(project: Project) {

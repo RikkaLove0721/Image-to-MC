@@ -46,6 +46,7 @@ export const MODE_LABEL: Record<string, string> = {
   relief: '浮雕',
   flat: '平板',
   terrain: '地貌',
+  spec: 'AI 蓝图',
 }
 
 export function modeLabel(mode?: string): string {

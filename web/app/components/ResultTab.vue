@@ -2,8 +2,6 @@
 const props = defineProps<{ projectId: string; models: any[] }>()
 const emit = defineEmits<{ refresh: []; toast: [msg: string, type: 'ok' | 'err'] }>()
 
-const isDesktop = useDesktopMode()
-
 const selectedName = ref<string | null>(null)
 const viewKey = ref('iso')
 
@@ -64,19 +62,8 @@ const percent = (count: number) => {
 }
 
 /**
- * 浏览器里保持原生链接行为, 桌面外壳里改成系统的另存为对话框,
- * 免得文件被丢进浏览器的下载目录里找不到.
+ * 浏览器里开新标签页, 桌面外壳里交给 pywebview 的内嵌窗口.
  */
-async function onDownload(event: MouseEvent, url?: string) {
-  if (!url || !isDesktop.value) return
-  event.preventDefault()
-  const name = filenameOf(url)
-  const full = `${url}${url.includes('?') ? '&' : '?'}download=1`
-  const state = await desktopSave(full, name)
-  if (state === 'saved') emit('toast', `已保存 ${name}`, 'ok')
-  else if (state === 'failed') emit('toast', '保存失败, 换个位置再试', 'err')
-}
-
 async function openViewer() {
   const url = current.value?.urls?.view
   if (!url) return
@@ -138,8 +125,8 @@ async function openViewer() {
         <div style="flex: 1" />
         <span class="badge brand">Java 1.12.2</span>
         <span class="badge">{{ current.manifest?.params?.preset || 'm' }}</span>
-        <button v-if="current.urls?.view" class="btn sm" @click="openViewer">
-          <UiIcon name="external" :size="13" /> 3D 查看器
+        <button class="btn sm ghost" @click="emit('refresh')">
+          <UiIcon name="refresh" :size="13" /> 重新扫描
         </button>
       </div>
 
@@ -162,6 +149,17 @@ async function openViewer() {
         </div>
       </div>
 
+      <div v-if="current.urls?.view" class="viewer-hero">
+        <div class="vh-ico"><UiIcon name="box" :size="22" /></div>
+        <div class="vh-text">
+          <div class="vh-title">3D 查看器</div>
+          <div class="vh-note">自由旋转、缩放，逐层查看内部结构</div>
+        </div>
+        <button class="btn primary" @click="openViewer">
+          <UiIcon name="external" :size="14" /> 打开 3D 查看器
+        </button>
+      </div>
+
       <div class="viewer">
         <div class="stage">
           <img v-if="stage" :src="stage.url" :alt="stage.label" />
@@ -181,14 +179,6 @@ async function openViewer() {
             <img :src="view.url" :alt="view.label" loading="lazy" />
             <span>{{ view.label }}</span>
           </button>
-          <a
-            v-if="current.urls?.schematic"
-            class="btn sm wide"
-            :href="current.urls.schematic + '?download=1'"
-            @click="onDownload($event, current.urls.schematic)"
-          >
-            <UiIcon name="download" :size="13" /> 下载 schematic
-          </a>
         </div>
       </div>
 
@@ -232,34 +222,9 @@ async function openViewer() {
           </tbody>
         </table>
 
-        <div class="dl-row">
-          <a
-            v-if="current.urls?.schematic"
-            class="btn sm"
-            :href="current.urls.schematic + '?download=1'"
-            @click="onDownload($event, current.urls.schematic)"
-          >
-            <UiIcon name="download" :size="13" /> .schematic
-          </a>
-          <a
-            v-if="current.urls?.blocks"
-            class="btn sm"
-            :href="current.urls.blocks + '?download=1'"
-            @click="onDownload($event, current.urls.blocks)"
-          >
-            <UiIcon name="download" :size="13" /> 方块清单 .txt
-          </a>
-          <a
-            v-if="current.urls?.layers"
-            class="btn sm"
-            :href="current.urls.layers + '?download=1'"
-            @click="onDownload($event, current.urls.layers)"
-          >
-            <UiIcon name="download" :size="13" /> 逐层平面图 .txt
-          </a>
-          <button v-if="current.urls?.view" class="btn sm" @click="openViewer">
-            <UiIcon name="external" :size="13" /> 打开 3D 查看器
-          </button>
+        <div class="fusion-note" style="margin: 16px 0 0">
+          <UiIcon name="info" :size="14" />
+          <span>模型文件与方块清单在「查看仓库内容」里按输出结果打包下载。</span>
         </div>
       </div>
     </section>

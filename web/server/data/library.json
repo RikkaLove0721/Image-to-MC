@@ -7,9 +7,11 @@
   "陶瓦",
   "木材",
   "玻璃与光",
+  "绿化",
+  "装饰",
   "其他"
  ],
- "total": 94,
+ "total": 177,
  "blocks": [
   {
    "id": 1,
@@ -124,6 +126,22 @@
    "category": "石材"
   },
   {
+   "id": 48,
+   "meta": 0,
+   "oldId": "48:0",
+   "nameEn": "mossy_cobblestone",
+   "nameZh": "苔石",
+   "hex": "#6E7A63",
+   "rgb": [
+    110,
+    122,
+    99
+   ],
+   "rough": true,
+   "semantic": false,
+   "category": "石材"
+  },
+  {
    "id": 98,
    "meta": 0,
    "oldId": "98:0",
@@ -134,6 +152,22 @@
     125,
     125,
     124
+   ],
+   "rough": true,
+   "semantic": false,
+   "category": "石材"
+  },
+  {
+   "id": 98,
+   "meta": 4,
+   "oldId": "98:4",
+   "nameEn": "stonebrick",
+   "nameZh": "苔石砖",
+   "hex": "#6F7B66",
+   "rgb": [
+    111,
+    123,
+    102
    ],
    "rough": true,
    "semantic": false,
@@ -246,6 +280,54 @@
     236,
     233,
     226
+   ],
+   "rough": false,
+   "semantic": false,
+   "category": "石材"
+  },
+  {
+   "id": 155,
+   "meta": 1,
+   "oldId": "155:1",
+   "nameEn": "chiseled_quartz_block",
+   "nameZh": "錾制石英块",
+   "hex": "#EBE7DE",
+   "rgb": [
+    235,
+    231,
+    222
+   ],
+   "rough": false,
+   "semantic": false,
+   "category": "石材"
+  },
+  {
+   "id": 155,
+   "meta": 2,
+   "oldId": "155:2",
+   "nameEn": "quartz_pillar",
+   "nameZh": "竖纹石英柱",
+   "hex": "#EDEAE3",
+   "rgb": [
+    237,
+    234,
+    227
+   ],
+   "rough": false,
+   "semantic": false,
+   "category": "石材"
+  },
+  {
+   "id": 155,
+   "meta": 3,
+   "oldId": "155:3",
+   "nameEn": "smooth_quartz",
+   "nameZh": "平滑石英块",
+   "hex": "#E9E5DC",
+   "rgb": [
+    233,
+    229,
+    220
    ],
    "rough": false,
    "semantic": false,
@@ -525,15 +607,143 @@
   },
   {
    "id": 95,
+   "meta": 0,
+   "oldId": "95:0",
+   "nameEn": "stained_glass",
+   "nameZh": "白色玻璃",
+   "hex": "#FFFFFF",
+   "rgb": [
+    255,
+    255,
+    255
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "玻璃与光"
+  },
+  {
+   "id": 95,
+   "meta": 1,
+   "oldId": "95:1",
+   "nameEn": "stained_glass",
+   "nameZh": "橙色玻璃",
+   "hex": "#D87F33",
+   "rgb": [
+    216,
+    127,
+    51
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "玻璃与光"
+  },
+  {
+   "id": 95,
+   "meta": 2,
+   "oldId": "95:2",
+   "nameEn": "stained_glass",
+   "nameZh": "品红色玻璃",
+   "hex": "#B24CD8",
+   "rgb": [
+    178,
+    76,
+    216
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "玻璃与光"
+  },
+  {
+   "id": 95,
    "meta": 3,
    "oldId": "95:3",
    "nameEn": "stained_glass",
    "nameZh": "淡蓝色玻璃",
-   "hex": "#86A8C4",
+   "hex": "#6699D8",
    "rgb": [
-    134,
-    168,
-    196
+    102,
+    153,
+    216
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "玻璃与光"
+  },
+  {
+   "id": 95,
+   "meta": 4,
+   "oldId": "95:4",
+   "nameEn": "stained_glass",
+   "nameZh": "黄色玻璃",
+   "hex": "#E5E533",
+   "rgb": [
+    229,
+    229,
+    51
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "玻璃与光"
+  },
+  {
+   "id": 95,
+   "meta": 5,
+   "oldId": "95:5",
+   "nameEn": "stained_glass",
+   "nameZh": "黄绿色玻璃",
+   "hex": "#7FCC19",
+   "rgb": [
+    127,
+    204,
+    25
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "玻璃与光"
+  },
+  {
+   "id": 95,
+   "meta": 6,
+   "oldId": "95:6",
+   "nameEn": "stained_glass",
+   "nameZh": "粉红色玻璃",
+   "hex": "#F27FA5",
+   "rgb": [
+    242,
+    127,
+    165
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "玻璃与光"
+  },
+  {
+   "id": 95,
+   "meta": 7,
+   "oldId": "95:7",
+   "nameEn": "stained_glass",
+   "nameZh": "灰色玻璃",
+   "hex": "#4C4C4C",
+   "rgb": [
+    76,
+    76,
+    76
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "玻璃与光"
+  },
+  {
+   "id": 95,
+   "meta": 8,
+   "oldId": "95:8",
+   "nameEn": "stained_glass",
+   "nameZh": "淡灰色玻璃",
+   "hex": "#999999",
+   "rgb": [
+    153,
+    153,
+    153
    ],
    "rough": false,
    "semantic": true,
@@ -545,11 +755,27 @@
    "oldId": "95:9",
    "nameEn": "stained_glass",
    "nameZh": "青色玻璃",
-   "hex": "#4D8A99",
+   "hex": "#4C7F99",
    "rgb": [
-    77,
-    138,
+    76,
+    127,
     153
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "玻璃与光"
+  },
+  {
+   "id": 95,
+   "meta": 10,
+   "oldId": "95:10",
+   "nameEn": "stained_glass",
+   "nameZh": "紫色玻璃",
+   "hex": "#7F3FB2",
+   "rgb": [
+    127,
+    63,
+    178
    ],
    "rough": false,
    "semantic": true,
@@ -561,11 +787,59 @@
    "oldId": "95:11",
    "nameEn": "stained_glass",
    "nameZh": "蓝色玻璃",
-   "hex": "#2E4A8E",
+   "hex": "#334CB2",
    "rgb": [
-    46,
-    74,
-    142
+    51,
+    76,
+    178
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "玻璃与光"
+  },
+  {
+   "id": 95,
+   "meta": 12,
+   "oldId": "95:12",
+   "nameEn": "stained_glass",
+   "nameZh": "棕色玻璃",
+   "hex": "#664C33",
+   "rgb": [
+    102,
+    76,
+    51
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "玻璃与光"
+  },
+  {
+   "id": 95,
+   "meta": 13,
+   "oldId": "95:13",
+   "nameEn": "stained_glass",
+   "nameZh": "绿色玻璃",
+   "hex": "#667F33",
+   "rgb": [
+    102,
+    127,
+    51
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "玻璃与光"
+  },
+  {
+   "id": 95,
+   "meta": 14,
+   "oldId": "95:14",
+   "nameEn": "stained_glass",
+   "nameZh": "红色玻璃",
+   "hex": "#993333",
+   "rgb": [
+    153,
+    51,
+    51
    ],
    "rough": false,
    "semantic": true,
@@ -577,27 +851,267 @@
    "oldId": "95:15",
    "nameEn": "stained_glass",
    "nameZh": "黑色玻璃",
-   "hex": "#26282B",
+   "hex": "#191919",
    "rgb": [
-    38,
-    40,
-    43
+    25,
+    25,
+    25
    ],
    "rough": false,
    "semantic": true,
    "category": "玻璃与光"
   },
   {
-   "id": 20,
-   "meta": 1,
-   "oldId": "20:1",
-   "nameEn": "thin_glass",
+   "id": 102,
+   "meta": 0,
+   "oldId": "102:0",
+   "nameEn": "stained_glass_pane",
    "nameZh": "玻璃板",
    "hex": "#C7DCE8",
    "rgb": [
     199,
     220,
     232
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "玻璃与光"
+  },
+  {
+   "id": 102,
+   "meta": 1,
+   "oldId": "102:1",
+   "nameEn": "stained_glass_pane",
+   "nameZh": "橙色玻璃板",
+   "hex": "#D87F33",
+   "rgb": [
+    216,
+    127,
+    51
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "玻璃与光"
+  },
+  {
+   "id": 102,
+   "meta": 2,
+   "oldId": "102:2",
+   "nameEn": "stained_glass_pane",
+   "nameZh": "品红色玻璃板",
+   "hex": "#B24CD8",
+   "rgb": [
+    178,
+    76,
+    216
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "玻璃与光"
+  },
+  {
+   "id": 102,
+   "meta": 3,
+   "oldId": "102:3",
+   "nameEn": "stained_glass_pane",
+   "nameZh": "淡蓝色玻璃板",
+   "hex": "#6699D8",
+   "rgb": [
+    102,
+    153,
+    216
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "玻璃与光"
+  },
+  {
+   "id": 102,
+   "meta": 4,
+   "oldId": "102:4",
+   "nameEn": "stained_glass_pane",
+   "nameZh": "黄色玻璃板",
+   "hex": "#E5E533",
+   "rgb": [
+    229,
+    229,
+    51
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "玻璃与光"
+  },
+  {
+   "id": 102,
+   "meta": 5,
+   "oldId": "102:5",
+   "nameEn": "stained_glass_pane",
+   "nameZh": "黄绿色玻璃板",
+   "hex": "#7FCC19",
+   "rgb": [
+    127,
+    204,
+    25
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "玻璃与光"
+  },
+  {
+   "id": 102,
+   "meta": 6,
+   "oldId": "102:6",
+   "nameEn": "stained_glass_pane",
+   "nameZh": "粉红色玻璃板",
+   "hex": "#F27FA5",
+   "rgb": [
+    242,
+    127,
+    165
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "玻璃与光"
+  },
+  {
+   "id": 102,
+   "meta": 7,
+   "oldId": "102:7",
+   "nameEn": "stained_glass_pane",
+   "nameZh": "灰色玻璃板",
+   "hex": "#4C4C4C",
+   "rgb": [
+    76,
+    76,
+    76
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "玻璃与光"
+  },
+  {
+   "id": 102,
+   "meta": 8,
+   "oldId": "102:8",
+   "nameEn": "stained_glass_pane",
+   "nameZh": "淡灰色玻璃板",
+   "hex": "#999999",
+   "rgb": [
+    153,
+    153,
+    153
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "玻璃与光"
+  },
+  {
+   "id": 102,
+   "meta": 9,
+   "oldId": "102:9",
+   "nameEn": "stained_glass_pane",
+   "nameZh": "青色玻璃板",
+   "hex": "#4C7F99",
+   "rgb": [
+    76,
+    127,
+    153
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "玻璃与光"
+  },
+  {
+   "id": 102,
+   "meta": 10,
+   "oldId": "102:10",
+   "nameEn": "stained_glass_pane",
+   "nameZh": "紫色玻璃板",
+   "hex": "#7F3FB2",
+   "rgb": [
+    127,
+    63,
+    178
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "玻璃与光"
+  },
+  {
+   "id": 102,
+   "meta": 11,
+   "oldId": "102:11",
+   "nameEn": "stained_glass_pane",
+   "nameZh": "蓝色玻璃板",
+   "hex": "#334CB2",
+   "rgb": [
+    51,
+    76,
+    178
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "玻璃与光"
+  },
+  {
+   "id": 102,
+   "meta": 12,
+   "oldId": "102:12",
+   "nameEn": "stained_glass_pane",
+   "nameZh": "棕色玻璃板",
+   "hex": "#664C33",
+   "rgb": [
+    102,
+    76,
+    51
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "玻璃与光"
+  },
+  {
+   "id": 102,
+   "meta": 13,
+   "oldId": "102:13",
+   "nameEn": "stained_glass_pane",
+   "nameZh": "绿色玻璃板",
+   "hex": "#667F33",
+   "rgb": [
+    102,
+    127,
+    51
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "玻璃与光"
+  },
+  {
+   "id": 102,
+   "meta": 14,
+   "oldId": "102:14",
+   "nameEn": "stained_glass_pane",
+   "nameZh": "红色玻璃板",
+   "hex": "#993333",
+   "rgb": [
+    153,
+    51,
+    51
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "玻璃与光"
+  },
+  {
+   "id": 102,
+   "meta": 15,
+   "oldId": "102:15",
+   "nameEn": "stained_glass_pane",
+   "nameZh": "黑色玻璃板",
+   "hex": "#191919",
+   "rgb": [
+    25,
+    25,
+    25
    ],
    "rough": false,
    "semantic": true,
@@ -618,6 +1132,86 @@
    "rough": false,
    "semantic": true,
    "category": "玻璃与光"
+  },
+  {
+   "id": 2,
+   "meta": 0,
+   "oldId": "2:0",
+   "nameEn": "grass",
+   "nameZh": "草方块",
+   "hex": "#7CBD6B",
+   "rgb": [
+    124,
+    189,
+    107
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "绿化"
+  },
+  {
+   "id": 31,
+   "meta": 1,
+   "oldId": "31:1",
+   "nameEn": "tallgrass",
+   "nameZh": "草丛",
+   "hex": "#7A9A43",
+   "rgb": [
+    122,
+    154,
+    67
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "绿化"
+  },
+  {
+   "id": 31,
+   "meta": 2,
+   "oldId": "31:2",
+   "nameEn": "tallgrass",
+   "nameZh": "蕨",
+   "hex": "#6E8C3C",
+   "rgb": [
+    110,
+    140,
+    60
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "绿化"
+  },
+  {
+   "id": 37,
+   "meta": 0,
+   "oldId": "37:0",
+   "nameEn": "yellow_flower",
+   "nameZh": "蒲公英",
+   "hex": "#D9C33B",
+   "rgb": [
+    217,
+    195,
+    59
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "绿化"
+  },
+  {
+   "id": 38,
+   "meta": 0,
+   "oldId": "38:0",
+   "nameEn": "red_flower",
+   "nameZh": "虞美人",
+   "hex": "#B3312C",
+   "rgb": [
+    179,
+    49,
+    44
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "绿化"
   },
   {
    "id": 169,
@@ -646,6 +1240,22 @@
     255,
     222,
     140
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "玻璃与光"
+  },
+  {
+   "id": 124,
+   "meta": 0,
+   "oldId": "124:0",
+   "nameEn": "redstone_lamp",
+   "nameZh": "红石灯",
+   "hex": "#B08B4F",
+   "rgb": [
+    176,
+    139,
+    79
    ],
    "rough": false,
    "semantic": true,
@@ -1514,6 +2124,726 @@
    "rough": false,
    "semantic": false,
    "category": "陶瓦"
+  },
+  {
+   "id": 18,
+   "meta": 0,
+   "oldId": "18:0",
+   "nameEn": "leaves",
+   "nameZh": "橡树树叶",
+   "hex": "#4A6E28",
+   "rgb": [
+    74,
+    110,
+    40
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "装饰"
+  },
+  {
+   "id": 18,
+   "meta": 1,
+   "oldId": "18:1",
+   "nameEn": "leaves",
+   "nameZh": "云杉树叶",
+   "hex": "#36512B",
+   "rgb": [
+    54,
+    81,
+    43
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "装饰"
+  },
+  {
+   "id": 18,
+   "meta": 2,
+   "oldId": "18:2",
+   "nameEn": "leaves",
+   "nameZh": "桦树树叶",
+   "hex": "#6A8A3C",
+   "rgb": [
+    106,
+    138,
+    60
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "装饰"
+  },
+  {
+   "id": 18,
+   "meta": 3,
+   "oldId": "18:3",
+   "nameEn": "leaves",
+   "nameZh": "丛林树叶",
+   "hex": "#3A7526",
+   "rgb": [
+    58,
+    117,
+    38
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "装饰"
+  },
+  {
+   "id": 161,
+   "meta": 0,
+   "oldId": "161:0",
+   "nameEn": "leaves",
+   "nameZh": "金合欢树叶",
+   "hex": "#57812A",
+   "rgb": [
+    87,
+    129,
+    42
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "装饰"
+  },
+  {
+   "id": 161,
+   "meta": 1,
+   "oldId": "161:1",
+   "nameEn": "leaves",
+   "nameZh": "深色橡树树叶",
+   "hex": "#2F4B22",
+   "rgb": [
+    47,
+    75,
+    34
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "装饰"
+  },
+  {
+   "id": 85,
+   "meta": 0,
+   "oldId": "85:0",
+   "nameEn": "fence",
+   "nameZh": "橡木栅栏",
+   "hex": "#A8874F",
+   "rgb": [
+    168,
+    135,
+    79
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "装饰"
+  },
+  {
+   "id": 188,
+   "meta": 0,
+   "oldId": "188:0",
+   "nameEn": "spruce_fence",
+   "nameZh": "云杉栅栏",
+   "hex": "#6A4A25",
+   "rgb": [
+    106,
+    74,
+    37
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "装饰"
+  },
+  {
+   "id": 189,
+   "meta": 0,
+   "oldId": "189:0",
+   "nameEn": "birch_fence",
+   "nameZh": "桦木栅栏",
+   "hex": "#C9B47A",
+   "rgb": [
+    201,
+    180,
+    122
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "装饰"
+  },
+  {
+   "id": 190,
+   "meta": 0,
+   "oldId": "190:0",
+   "nameEn": "jungle_fence",
+   "nameZh": "丛林栅栏",
+   "hex": "#96694A",
+   "rgb": [
+    150,
+    105,
+    74
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "装饰"
+  },
+  {
+   "id": 191,
+   "meta": 0,
+   "oldId": "191:0",
+   "nameEn": "acacia_fence",
+   "nameZh": "金合欢栅栏",
+   "hex": "#A5562B",
+   "rgb": [
+    165,
+    86,
+    43
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "装饰"
+  },
+  {
+   "id": 192,
+   "meta": 0,
+   "oldId": "192:0",
+   "nameEn": "dark_oak_fence",
+   "nameZh": "深色橡木栅栏",
+   "hex": "#3A2712",
+   "rgb": [
+    58,
+    39,
+    18
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "装饰"
+  },
+  {
+   "id": 113,
+   "meta": 0,
+   "oldId": "113:0",
+   "nameEn": "nether_brick_fence",
+   "nameZh": "下界砖栅栏",
+   "hex": "#34201F",
+   "rgb": [
+    52,
+    32,
+    31
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "装饰"
+  },
+  {
+   "id": 101,
+   "meta": 0,
+   "oldId": "101:0",
+   "nameEn": "iron_bars",
+   "nameZh": "铁栏杆",
+   "hex": "#8A8A8A",
+   "rgb": [
+    138,
+    138,
+    138
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "装饰"
+  },
+  {
+   "id": 17,
+   "meta": 0,
+   "oldId": "17:0",
+   "nameEn": "log",
+   "nameZh": "橡木原木",
+   "hex": "#6B5233",
+   "rgb": [
+    107,
+    82,
+    51
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "装饰"
+  },
+  {
+   "id": 17,
+   "meta": 1,
+   "oldId": "17:1",
+   "nameEn": "log",
+   "nameZh": "云杉原木",
+   "hex": "#3B2C19",
+   "rgb": [
+    59,
+    44,
+    25
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "装饰"
+  },
+  {
+   "id": 17,
+   "meta": 2,
+   "oldId": "17:2",
+   "nameEn": "log",
+   "nameZh": "桦木原木",
+   "hex": "#D8D4C7",
+   "rgb": [
+    216,
+    212,
+    199
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "装饰"
+  },
+  {
+   "id": 17,
+   "meta": 3,
+   "oldId": "17:3",
+   "nameEn": "log",
+   "nameZh": "丛林原木",
+   "hex": "#56431F",
+   "rgb": [
+    86,
+    67,
+    31
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "装饰"
+  },
+  {
+   "id": 162,
+   "meta": 0,
+   "oldId": "162:0",
+   "nameEn": "log2",
+   "nameZh": "金合欢原木",
+   "hex": "#6B5334",
+   "rgb": [
+    107,
+    83,
+    52
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "装饰"
+  },
+  {
+   "id": 162,
+   "meta": 1,
+   "oldId": "162:1",
+   "nameEn": "log2",
+   "nameZh": "深色橡木原木",
+   "hex": "#3F2D1B",
+   "rgb": [
+    63,
+    45,
+    27
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "装饰"
+  },
+  {
+   "id": 47,
+   "meta": 0,
+   "oldId": "47:0",
+   "nameEn": "bookshelf",
+   "nameZh": "书架",
+   "hex": "#6E5330",
+   "rgb": [
+    110,
+    83,
+    48
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "装饰"
+  },
+  {
+   "id": 58,
+   "meta": 0,
+   "oldId": "58:0",
+   "nameEn": "crafting_table",
+   "nameZh": "工作台",
+   "hex": "#7A5230",
+   "rgb": [
+    122,
+    82,
+    48
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "装饰"
+  },
+  {
+   "id": 84,
+   "meta": 0,
+   "oldId": "84:0",
+   "nameEn": "jukebox",
+   "nameZh": "唱片机",
+   "hex": "#5C4028",
+   "rgb": [
+    92,
+    64,
+    40
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "装饰"
+  },
+  {
+   "id": 25,
+   "meta": 0,
+   "oldId": "25:0",
+   "nameEn": "noteblock",
+   "nameZh": "音符盒",
+   "hex": "#6E4A2A",
+   "rgb": [
+    110,
+    74,
+    42
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "装饰"
+  },
+  {
+   "id": 61,
+   "meta": 0,
+   "oldId": "61:0",
+   "nameEn": "furnace",
+   "nameZh": "熔炉",
+   "hex": "#6E6E6E",
+   "rgb": [
+    110,
+    110,
+    110
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "装饰"
+  },
+  {
+   "id": 116,
+   "meta": 0,
+   "oldId": "116:0",
+   "nameEn": "enchanting_table",
+   "nameZh": "附魔台",
+   "hex": "#5A2E2E",
+   "rgb": [
+    90,
+    46,
+    46
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "装饰"
+  },
+  {
+   "id": 106,
+   "meta": 0,
+   "oldId": "106:0",
+   "nameEn": "vine",
+   "nameZh": "藤蔓",
+   "hex": "#3E6B24",
+   "rgb": [
+    62,
+    107,
+    36
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "装饰"
+  },
+  {
+   "id": 170,
+   "meta": 0,
+   "oldId": "170:0",
+   "nameEn": "hay_block",
+   "nameZh": "干草块",
+   "hex": "#A07A22",
+   "rgb": [
+    160,
+    122,
+    34
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "装饰"
+  },
+  {
+   "id": 86,
+   "meta": 0,
+   "oldId": "86:0",
+   "nameEn": "pumpkin",
+   "nameZh": "南瓜",
+   "hex": "#C47418",
+   "rgb": [
+    196,
+    116,
+    24
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "装饰"
+  },
+  {
+   "id": 91,
+   "meta": 0,
+   "oldId": "91:0",
+   "nameEn": "lit_pumpkin",
+   "nameZh": "南瓜灯",
+   "hex": "#D5821C",
+   "rgb": [
+    213,
+    130,
+    28
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "装饰"
+  },
+  {
+   "id": 103,
+   "meta": 0,
+   "oldId": "103:0",
+   "nameEn": "melon_block",
+   "nameZh": "西瓜",
+   "hex": "#7C9C2E",
+   "rgb": [
+    124,
+    156,
+    46
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "装饰"
+  },
+  {
+   "id": 19,
+   "meta": 0,
+   "oldId": "19:0",
+   "nameEn": "sponge",
+   "nameZh": "海绵",
+   "hex": "#C3C34A",
+   "rgb": [
+    195,
+    195,
+    74
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "装饰"
+  },
+  {
+   "id": 46,
+   "meta": 0,
+   "oldId": "46:0",
+   "nameEn": "tnt",
+   "nameZh": "TNT",
+   "hex": "#B03A2E",
+   "rgb": [
+    176,
+    58,
+    46
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "装饰"
+  },
+  {
+   "id": 165,
+   "meta": 0,
+   "oldId": "165:0",
+   "nameEn": "slime",
+   "nameZh": "黏液块",
+   "hex": "#7EBF6F",
+   "rgb": [
+    126,
+    191,
+    111
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "装饰"
+  },
+  {
+   "id": 198,
+   "meta": 0,
+   "oldId": "198:0",
+   "nameEn": "end_rod",
+   "nameZh": "末地烛",
+   "hex": "#E8E4D8",
+   "rgb": [
+    232,
+    228,
+    216
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "装饰"
+  },
+  {
+   "id": 133,
+   "meta": 0,
+   "oldId": "133:0",
+   "nameEn": "emerald_block",
+   "nameZh": "绿宝石块",
+   "hex": "#2CB67D",
+   "rgb": [
+    44,
+    182,
+    125
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "装饰"
+  },
+  {
+   "id": 57,
+   "meta": 0,
+   "oldId": "57:0",
+   "nameEn": "diamond_block",
+   "nameZh": "钻石块",
+   "hex": "#4AEDD9",
+   "rgb": [
+    74,
+    237,
+    217
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "装饰"
+  },
+  {
+   "id": 139,
+   "meta": 0,
+   "oldId": "139:0",
+   "nameEn": "cobblestone_wall",
+   "nameZh": "圆石墙",
+   "hex": "#7A7A7A",
+   "rgb": [
+    122,
+    122,
+    122
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "装饰"
+  },
+  {
+   "id": 139,
+   "meta": 1,
+   "oldId": "139:1",
+   "nameEn": "cobblestone_wall",
+   "nameZh": "苔石墙",
+   "hex": "#6E7A63",
+   "rgb": [
+    110,
+    122,
+    99
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "装饰"
+  },
+  {
+   "id": 171,
+   "meta": 0,
+   "oldId": "171:0",
+   "nameEn": "carpet",
+   "nameZh": "白色地毯",
+   "hex": "#E9ECEC",
+   "rgb": [
+    233,
+    236,
+    236
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "装饰"
+  },
+  {
+   "id": 171,
+   "meta": 14,
+   "oldId": "171:14",
+   "nameEn": "carpet",
+   "nameZh": "红色地毯",
+   "hex": "#A12722",
+   "rgb": [
+    161,
+    39,
+    34
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "装饰"
+  },
+  {
+   "id": 171,
+   "meta": 11,
+   "oldId": "171:11",
+   "nameEn": "carpet",
+   "nameZh": "蓝色地毯",
+   "hex": "#35399D",
+   "rgb": [
+    53,
+    57,
+    157
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "装饰"
+  },
+  {
+   "id": 171,
+   "meta": 13,
+   "oldId": "171:13",
+   "nameEn": "carpet",
+   "nameZh": "绿色地毯",
+   "hex": "#546D1B",
+   "rgb": [
+    84,
+    109,
+    27
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "装饰"
+  },
+  {
+   "id": 171,
+   "meta": 15,
+   "oldId": "171:15",
+   "nameEn": "carpet",
+   "nameZh": "黑色地毯",
+   "hex": "#141519",
+   "rgb": [
+    20,
+    21,
+    25
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "装饰"
+  },
+  {
+   "id": 171,
+   "meta": 4,
+   "oldId": "171:4",
+   "nameEn": "carpet",
+   "nameZh": "黄色地毯",
+   "hex": "#F8C627",
+   "rgb": [
+    248,
+    198,
+    39
+   ],
+   "rough": false,
+   "semantic": true,
+   "category": "装饰"
   }
  ]
 }

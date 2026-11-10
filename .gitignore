@@ -39,3 +39,8 @@ desktop.ini
 .env
 .env.*
 !.env.example
+
+# 本机 AI 密钥, 不进仓库
+ai.json
+# 视觉能力探测缓存（含模型名与结论，本机数据）
+vision-probe.json
