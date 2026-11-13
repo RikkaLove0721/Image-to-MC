@@ -249,6 +249,74 @@ def stop_child(child: subprocess.Popen | None) -> None:
         child.kill()
 
 
+def _hwnd_int(handle) -> int:
+    """.NET 的 IntPtr 不能直接 int()，必须走 ToInt64()。"""
+    return int(handle.ToInt64()) if hasattr(handle, "ToInt64") else int(handle)
+
+
+def _process_windows() -> list[tuple[int, str]]:
+    """本进程的所有顶层窗口 (hwnd, 标题)。
+
+    最后一道兜底：不同 pywebview 版本把 Form 挂在不同地方（window.native /
+    BrowserView.instances / 都不挂），枚举窗口不依赖它的内部结构。
+    """
+    from ctypes import wintypes
+
+    out: list[tuple[int, str]] = []
+    user32 = ctypes.windll.user32
+    proto = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_void_p, ctypes.c_void_p)
+
+    def cb(hwnd, _lp):
+        pid = wintypes.DWORD()
+        user32.GetWindowThreadProcessId(ctypes.c_void_p(hwnd), ctypes.byref(pid))
+        if pid.value == os.getpid():
+            n = user32.GetWindowTextLengthW(ctypes.c_void_p(hwnd))
+            buf = ctypes.create_unicode_buffer(n + 1)
+            user32.GetWindowTextW(ctypes.c_void_p(hwnd), buf, n + 1)
+            if buf.value:
+                out.append((int(hwnd), buf.value))
+        return True
+
+    user32.EnumWindows(proto(cb), 0)
+    return out
+
+
+def _viewer_hwnd(win) -> int:
+    """拿查看器窗口的 HWND。三条路依次试，哪条通用哪条。"""
+    # 1) 有的后端在窗口创建时写了 window.native = Form
+    native = getattr(win, "native", None)
+    handle = getattr(native, "Handle", None) if native is not None else None
+    if handle is not None:
+        try:
+            return _hwnd_int(handle)
+        except Exception:  # noqa: BLE001
+            pass
+
+    # 2) winforms 的注册表：BrowserView.instances[uid] -> 窗口对象（带 .form）
+    try:
+        from webview.platforms.winforms import BrowserView
+
+        view = BrowserView.instances.get(getattr(win, "uid", None))
+        form = getattr(view, "form", None) or view
+        handle = getattr(form, "Handle", None)
+        if handle is not None:
+            return _hwnd_int(handle)
+    except Exception:  # noqa: BLE001
+        pass
+
+    # 3) 枚举本进程窗口：先按标题精确匹配，再退到"不是主窗口的那个"
+    title = str(getattr(win, "title", "") or "")
+    wins = _process_windows()
+    if title:
+        for hwnd, t in wins:
+            if t == title:
+                return hwnd
+    for hwnd, t in wins:
+        if t and t != WINDOW_TITLE:
+            return hwnd
+    return 0
+
+
 class _ViewerApi:
     """查看器窗口的 JS 桥：只负责"置顶"一件事.
 
@@ -282,17 +350,23 @@ class _ViewerApi:
             except Exception as exc:  # noqa: BLE001
                 return {"ok": False, "error": str(exc)}
 
-        # winforms 后端在创建窗口时写了 window.native = Form，Handle 就是 HWND
-        try:
-            hwnd = int(win.native.Handle)
-        except Exception as exc:  # noqa: BLE001
-            return {"ok": False, "error": f"拿不到窗口句柄：{exc}"}
+        hwnd = _viewer_hwnd(win)
+        if not hwnd:
+            return {"ok": False, "error": "拿不到窗口句柄（窗口可能还没显示完）"}
 
         HWND_TOPMOST, HWND_NOTOPMOST = -1, -2
         SWP_NOMOVE, SWP_NOSIZE, SWP_NOACTIVATE = 0x0002, 0x0001, 0x0010
-        ok = ctypes.windll.user32.SetWindowPos(
-            hwnd,
-            HWND_TOPMOST if on else HWND_NOTOPMOST,
+        user32 = ctypes.windll.user32
+        # 显式声明参数类型：HWND 在 64 位下是 8 字节，不声明会被 ctypes 当 C int
+        # 截断（句柄值小的时候碰巧没事，大了就设错窗口）。
+        user32.SetWindowPos.argtypes = [
+            ctypes.c_void_p, ctypes.c_void_p,
+            ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_uint,
+        ]
+        user32.SetWindowPos.restype = ctypes.c_bool
+        ok = user32.SetWindowPos(
+            ctypes.c_void_p(hwnd),
+            ctypes.c_void_p(HWND_TOPMOST if on else HWND_NOTOPMOST),
             0, 0, 0, 0,
             SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE,
         )
@@ -650,6 +724,42 @@ def main() -> int:
                     say(log, f"自检失败 {exc}")
 
             threading.Thread(target=check, daemon=True).start()
+
+        if os.environ.get("MC12_TOPPROBE"):
+            # 置顶自检：开一个查看器窗口 → 调 set_on_top(True) → 读窗口扩展样式里的
+            # WS_EX_TOPMOST 位，把结果写进日志。Windows 上这个功能曾经"看着调用成功、
+            # 实际啥也没发生"，光看返回值不够，必须读回系统状态。
+            def topprobe() -> None:
+                try:
+                    bridge.open_viewer("/api/watch", "置顶自检")
+                    time.sleep(4.0)
+                    api = _ViewerApi(bridge)
+                    r1 = api.set_on_top(True)
+                    time.sleep(0.6)
+                    from ctypes import wintypes
+                    u = ctypes.windll.user32
+                    hwnd = _viewer_hwnd(bridge._viewer) if bridge._viewer else 0
+                    u.GetWindowLongW.argtypes = [ctypes.c_void_p, ctypes.c_int]
+                    u.GetWindowLongW.restype = ctypes.c_long
+                    ex = u.GetWindowLongW(ctypes.c_void_p(hwnd), -20) if hwnd else 0
+                    r2 = api.set_on_top(False)
+                    time.sleep(0.5)
+                    ex2 = u.GetWindowLongW(ctypes.c_void_p(hwnd), -20) if hwnd else 0
+                    say(
+                        log,
+                        f"置顶自检: hwnd={hwnd} 置顶返回={r1} WS_EX_TOPMOST={bool(ex & 0x8)} "
+                        f"还原返回={r2} 还原后={bool(ex2 & 0x8)} 本进程窗口={_process_windows()}",
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    say(log, f"置顶自检失败 {type(exc).__name__}: {exc}")
+                finally:
+                    time.sleep(1.0)
+                    try:
+                        window.destroy()
+                    except Exception:  # noqa: BLE001
+                        pass
+
+            threading.Thread(target=topprobe, daemon=True).start()
 
     try:
         webview.start(
