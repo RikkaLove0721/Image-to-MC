@@ -193,6 +193,11 @@ const latestMeta = computed(() => {
 
 onMounted(() => {
   if (tab.value === 'update') runCheck(false)
+  // 刷新页面后要接上上一次的进度：包已经下好了却看不到"重启并完成更新"，
+  // 用户只能再下一遍 68 MB。
+  poll().then(() => {
+    if (busy.value) startPoll()
+  })
 })
 onUnmounted(stopPoll)
 
