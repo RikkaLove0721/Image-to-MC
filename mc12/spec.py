@@ -3292,6 +3292,20 @@ class _Builder:
                 break
         return built
 
+    def _stair_width(self, v: Volume) -> int:
+        """楼梯宽度：建筑越大越宽（1~3 格）。
+
+        一格宽的楼梯在大宅里像一根梯子，两个人对着走都过不去；
+        但小屋里给 3 格宽又会把整个房间挤掉。按体块短边定档：
+        <14 格 1 宽、14~23 格 2 宽、≥24 格 3 宽。
+        """
+        span = min(v.w, v.d)
+        if span >= 24:
+            return 3
+        if span >= 14:
+            return 2
+        return 1
+
     def _stairs(self, v: Volume, y0: int, y1: int, rnd: random.Random,
                 reserved: dict) -> int:
         """在 y0 层与 y1 层之间架一部楼梯，返回台阶数（0 = 放不下）。
@@ -3299,6 +3313,9 @@ class _Builder:
         走法就是 MC 里最土也最好用的那种：往前走一格、往上一格，
         每级都是一整块方块。上层楼板在"头会撞到"的那两列开洞，
         于是楼梯井只有 2 格长，不是把整层楼板掀掉。
+
+        梯宽按建筑大小给（见 _stair_width），并且贴着一面内墙铺开 ——
+        两格以上的楼梯从外面看进来才有"这儿有楼梯"的体量。
         """
         rise = y1 - y0
         if rise < 3:
@@ -3306,44 +3323,65 @@ class _Builder:
         n = rise - 1  # 台阶块数：1 格高 1 格远，顶层那格由楼板自己当
         ix0, ix1 = v.x + 1, v.x1 - 1
         iz0, iz1 = v.z + 1, v.z1 - 1
+        wid = self._stair_width(v)
+
+        # (dx, dz) 是前进方向，(sx, sz) 是梯段起点，
+        # (px, pz) 是加宽方向 —— 一律朝屋里，别长出墙外。
         cands = []
         # 贴着内墙根走，别占房间正中间；四个角都试一遍，
         # 总有一个角没被别的体块/窗框占掉。
         if ix1 - ix0 + 1 >= n + 2:
-            cands.append((1, 0, ix0, iz0))
-            cands.append((-1, 0, ix1, iz1))
+            cands.append((1, 0, ix0, iz0, 0, 1))
+            cands.append((-1, 0, ix1, iz1, 0, -1))
         if iz1 - iz0 + 1 >= n + 2:
-            cands.append((0, 1, ix0, iz0))
-            cands.append((0, -1, ix1, iz1))
+            cands.append((0, 1, ix0, iz0, 1, 0))
+            cands.append((0, -1, ix1, iz1, -1, 0))
         rnd.shuffle(cands)
         mat = self._wall_mat(rnd)
-        for dx, dz, sx, sz in cands:
-            cells = [(sx + dx * i, sz + dz * i) for i in range(n)]
+        for dx, dz, sx, sz, px, pz in cands:
+            # 加宽是垂直于梯段的：沿 x 走就占 z 方向，反之亦然。
+            # 每种朝向各自算一次上限，留一格走道，别把房间横向堵死。
+            wcap = (iz1 - iz0 + 1) if dx else (ix1 - ix0 + 1)
+            w = max(1, min(wid, wcap - 1))
+            cells = [
+                (sx + dx * i + px * k, sz + dz * i + pz * k)
+                for i in range(n)
+                for k in range(w)
+            ]
             ok = True
-            for i, (x, z) in enumerate(cells):
+            for i in range(n):
                 h = y0 + 1 + i
                 # 台阶之上要有 2 格净空（玩家身高），撞到楼板的那几列
                 # 待会儿开洞；这里先确认没有别的实体（邻栋的墙、窗台）。
-                for yy in range(h, min(y1, h + 3)):
-                    if self.get(x, yy, z) >= 0:
-                        ok = False
+                for k in range(w):
+                    x = sx + dx * i + px * k
+                    z = sz + dz * i + pz * k
+                    for yy in range(h, min(y1, h + 3)):
+                        if self.get(x, yy, z) >= 0:
+                            ok = False
+                            break
+                    if not ok:
                         break
                 if not ok:
                     break
             if not ok:
                 continue
-            for i, (x, z) in enumerate(cells):
+            for i in range(n):
                 h = y0 + 1 + i
-                self.put(x, h, z, mat)
-                if h >= y1 - 2:
-                    self.carve(x, y1, z)
+                for k in range(w):
+                    x = sx + dx * i + px * k
+                    z = sz + dz * i + pz * k
+                    self.put(x, h, z, mat)
+                    if h >= y1 - 2:
+                        self.carve(x, y1, z)
             self.stair_log.append((y0, y1, cells))
             # 楼梯井 + 进出口各留一格：隔墙不许压在楼梯上/楼梯口
+            band = set(cells)
+            for k in range(w):
+                band.add((sx - dx + px * k, sz - dz + pz * k))
+                band.add((sx + dx * n + px * k, sz + dz * n + pz * k))
             for lv in (y0, y1):
-                res = reserved.setdefault(lv, set())
-                res.update(cells)
-                res.add((sx - dx, sz - dz))
-                res.add((sx + dx * n, sz + dz * n))
+                reserved.setdefault(lv, set()).update(band)
             return n
         return 0
 
