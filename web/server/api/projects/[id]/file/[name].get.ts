@@ -1,16 +1,9 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { runCore } from '../../../../utils/core'
+import { VIEWER_TEMPLATE } from '../../../../utils/viewer'
 
-/**
- * 查看器模板版本，必须和 mc12/viewer.py 的 TEMPLATE_VERSION 一致。
- *
- * `_view.html` 是构建时烘出来的，模板固定在文件里 —— 查看器加了新功能
- * （比如方块查询），老模型的页面还是旧壳，用户会以为功能没做。
- * 所以取文件时比对一下标记，版本旧的就让后端**就地换壳**：
- * 复用页面里已内联的体素数据重新套模板，模型一格不动。
- */
-const VIEWER_TEMPLATE = '5'
+/* 模板版本与换壳逻辑统一放在 utils/viewer.ts：导出分享页那边也要用同一份版本号 */
 
 const TYPES: Record<string, string> = {
   '.png': 'image/png',

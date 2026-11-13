@@ -121,15 +121,21 @@ const settings = computed<{ key: string; label: string; value: string }[]>(() =>
   return rows
 })
 
-async function onDownload(event: MouseEvent, url?: string) {
+async function onDownload(event: MouseEvent, url?: string, filename?: string) {
   if (!url || !isDesktop.value) return
   event.preventDefault()
-  const name = filenameOf(url)
+  const name = filename || filenameOf(url)
   const full = `${url}${url.includes('?') ? '&' : '?'}download=1`
   const state = await desktopSave(full, name)
   if (state === 'saved') emit('toast', `已保存 ${name}`, 'ok')
   else if (state === 'failed') emit('toast', '保存失败, 换个位置再试', 'err')
 }
+
+/** 离线预览页：一个 HTML 文件，3D 引擎也内联在里面，发给朋友双击就能看。 */
+const shareUrl = computed(() =>
+  current.value ? `/api/projects/${props.projectId}/share?name=${encodeURIComponent(current.value.name)}` : '',
+)
+const shareName = computed(() => (current.value ? `${current.value.name}-预览.html` : '模型预览.html'))
 
 async function copySpec() {
   if (!specText.value) return
@@ -331,6 +337,18 @@ async function removeModel() {
               >
                 <UiIcon name="download" :size="13" /> AI 蓝图 .json
               </a>
+              <a
+                v-if="shareUrl"
+                class="btn sm wide"
+                :href="shareUrl"
+                :download="shareName"
+                @click="onDownload($event, shareUrl, shareName)"
+              >
+                <UiIcon name="download" :size="13" /> 模型预览 .html
+              </a>
+            </div>
+            <div v-if="shareUrl" class="share-note">
+              单个 HTML 文件，3D 引擎已内联：发给朋友双击就能转着看，不用装软件、不用联网。
             </div>
             <div v-if="!current.urls?.spec" style="font-size: 11px; color: var(--faint); margin-top: 8px">
               这个模型是照片直转的，没有 AI 蓝图。

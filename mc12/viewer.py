@@ -49,7 +49,7 @@ def build_payload(vox: np.ndarray, blocks: list[Block], name: str) -> dict:
 
 # 模板版本：改过查看器就 +1。服务端会在取 _view.html 时比对，
 # 版本旧的就地用页面里已内联的体素数据重套一次模板（模型一格不动）。
-TEMPLATE_VERSION = "5"
+TEMPLATE_VERSION = "6"
 
 _TMPL = r"""<!DOCTYPE html>
 <html lang="zh-CN">
@@ -77,11 +77,6 @@ _TMPL = r"""<!DOCTYPE html>
   #info .qbtn.on:hover { background:#111; }
   #info .qbtn .dot { width:7px; height:7px; border-radius:50%; background:#B9B7B0; }
   #info .qbtn.on .dot { background:#7CE07C; box-shadow:0 0 0 3px rgba(124,224,124,.25); }
-  /* 右上角那行"按住 R 置顶"：只在桌面外壳里显示，浏览器里 JS 不会填字 */
-  #topbar-tip { position:absolute; top:16px; right:16px; padding:6px 10px;
-    border-radius:8px; background:rgba(44,44,42,.72); color:#fff; font-size:12px;
-    letter-spacing:.2px; pointer-events:none; opacity:0; transition:opacity .2s ease; z-index:9; }
-  #topbar-tip.on { opacity:1; }
   .li.hl { background:#FFF3C4; border-radius:6px; box-shadow:inset 0 0 0 1px rgba(0,0,0,.06); }
   .li.hl .nm { font-weight:600; }
   #legend { top:16px; right:16px; width:246px; max-height:calc(100% - 150px); overflow:auto; }
@@ -118,7 +113,6 @@ _TMPL = r"""<!DOCTYPE html>
 </style>
 </head>
 <body>
-<div id="topbar-tip"></div>
 <div id="app"></div>
 
 <div class="card" id="info">
@@ -130,9 +124,6 @@ _TMPL = r"""<!DOCTYPE html>
   <div class="row"><span>原点</span><b>西南下角 (0,0,0)</b></div>
   <button class="qbtn" id="btnPick" title="开启后把鼠标移到方块上，右边清单会高亮到对应材料">
     <span class="dot"></span><span id="pickTxt">方块查询</span>
-  </button>
-  <button class="qbtn" id="btnTop" title="让窗口浮在游戏上面（也可以按住 R）">
-    <span class="dot"></span><span id="topTxt">窗口置顶（R）</span>
   </button>
 </div>
 
@@ -541,94 +532,6 @@ controls.update();
     var app = document.getElementById('app');
     if (app && app.children.length === 0) document.getElementById('err').style.display = 'grid';
   }, 4000);
-</script>
-<script>
-/* 按住 R 把窗口浮到最前（方便一边看游戏一边照着盖），松开回到普通层级；
-   也可以点左边那张卡上的「窗口置顶（R）」按钮切开关（一直按着 R 太累了）。
-
-   只有桌面外壳（pywebview）里才有窗口可控：浏览器里没有 window.pywebview.api.set_on_top，
-   这时按钮不显示、按键不响应，静默降级。
-   注意 pywebview 6 的 Windows 后端（winforms/edgechromium）**没有实现** set_on_top，
-   所以外壳那边是直接拿 HWND 调 SetWindowPos 的；这里只管调用与显示结果。 */
-(function () {
-  var api = null;
-  var on = false;
-  var pinned = false;           // 按钮点出来的"常驻置顶"
-  function bridge() {
-    return (window.pywebview && window.pywebview.api) || null;
-  }
-  var tip = document.getElementById('topbar-tip');
-  var btn = document.getElementById('btnTop');
-  var btnTxt = document.getElementById('topTxt');
-
-  function showTip(text, show) {
-    if (!tip) return;
-    if (text) tip.textContent = text;
-    tip.classList.toggle('on', !!show);
-  }
-  function paint() {
-    if (!btn) return;
-    btn.classList.toggle('on', pinned || on);
-    if (btnTxt) btnTxt.textContent = pinned ? '已置顶 · 点一下取消' : '窗口置顶（R）';
-  }
-
-  function setTop(v) {
-    if (on === v) return;
-    on = v;
-    var a = api || bridge();
-    if (!a || !a.set_on_top) return;
-    var p;
-    try { p = a.set_on_top(v); } catch (e) { return; }
-    if (p && p.then) {
-      p.then(function (r) {
-        // 失败要让用户看见，否则就是"按了没反应"
-        if (r && r.ok === false) showTip('置顶没生效：' + (r.error || '未知原因'), true);
-      });
-    }
-    showTip(v ? '已置顶 · 松开 R 还原' : '按住 R 置顶，松开还原', !!api);
-    paint();
-  }
-
-  function bind() {
-    api = bridge();
-    if (api && api.set_on_top) {
-      showTip('按住 R 置顶 · 也可点左侧按钮', true);
-      if (btn) btn.style.display = '';
-    }
-    paint();
-  }
-  window.addEventListener('pywebviewready', bind);
-  if (btn) btn.style.display = 'none';   // 浏览器里没这功能，别摆一个死按钮
-  bind();
-
-  if (btn) {
-    btn.addEventListener('click', function () {
-      pinned = !pinned;
-      if (pinned) { on = false; setTop(true); }
-      else setTop(false);
-      paint();
-    });
-  }
-
-  document.addEventListener('keydown', function (e) {
-    if (e.key !== 'r' && e.key !== 'R') return;
-    if (e.ctrlKey || e.metaKey || e.altKey) return;
-    if (e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
-    if (e.repeat) return;
-    setTop(true);
-  });
-  document.addEventListener('keyup', function (e) {
-    if (e.key !== 'r' && e.key !== 'R') return;
-    // 点过按钮的"常驻置顶"不因为松手而取消
-    if (!pinned) setTop(false);
-  });
-  window.addEventListener('blur', function () {
-    if (!pinned) setTop(false);
-  });
-  document.addEventListener('visibilitychange', function () {
-    if (document.hidden && !pinned) setTop(false);
-  });
-})();
 </script>
 </body>
 </html>

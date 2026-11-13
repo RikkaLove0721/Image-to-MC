@@ -1830,6 +1830,14 @@ p {
   gap: 7px;
 }
 
+/* 导出分享预览页下面那行说明 */
+.share-note {
+  margin-top: 8px;
+  font-size: 11px;
+  line-height: 1.7;
+  color: var(--faint);
+}
+
 .repo-spec,
 .repo-blocks {
   padding: 14px 16px;
