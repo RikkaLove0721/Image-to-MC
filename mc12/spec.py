@@ -3204,6 +3204,32 @@ class _Builder:
                 return (axis, s, u0, u1)
         return None
 
+    def _derived_floors(self, v: Volume) -> list[tuple[int, int]]:
+        """蓝图没写楼层（floors=0）时，按高度自己铺楼板并给出分层。
+
+        手写蓝图（布达拉宫、白宫那种）常常一个 floors 都不写，体块就是一整块
+        空壳。室内设计打开后如果只隔地面一层，上面几十格全是空的，楼梯也没处放。
+        这里按每 4~6 格一层补楼板 —— **只补在体块内部**，外轮廓一格不动；
+        层高太矮（<9 格）就不补，免得把一个大空间切成两个站不直的低矮层。
+        """
+        levels: list[tuple[int, int]] = [(v.y, v.y1)]
+        if v.h < 9:
+            return levels
+        n = max(1, round(v.h / 5.0))
+        step = max(3, v.h // n)
+        ys = [v.y]
+        y = v.y + step
+        while y < v.y1 - 1:
+            ys.append(y)
+            for x in range(v.x + 1, v.x1):
+                for z in range(v.z + 1, v.z1):
+                    if not v.contains(x, z):
+                        continue
+                    if self.get(x, y, z) < 0:
+                        self.put(x, y, z, v.floor_mat or v.mat)
+            y += step
+        return [(yy, ys[i + 1] if i + 1 < len(ys) else v.y1) for i, yy in enumerate(ys)]
+
     def _rooms(self, v: Volume, lo: int, hi: int, rnd: random.Random,
                reserved: set) -> int:
         """把一层楼隔成几间，返回砌了几道墙。
@@ -3262,7 +3288,7 @@ class _Builder:
             for y in range(lo + 1, hi):
                 for u in range(u0, u1 + 1):
                     x, z = (s, u) if axis == "x" else (u, s)
-                    if (x, z) in reserved:
+                    if (x, z) in reserved or not v.contains(x, z):
                         continue
                     if self.get(x, y, z) < 0:
                         self.put(x, y, z, mat)
@@ -3327,16 +3353,19 @@ class _Builder:
 
         # (dx, dz) 是前进方向，(sx, sz) 是梯段起点，
         # (px, pz) 是加宽方向 —— 一律朝屋里，别长出墙外。
+        # 先贴内墙根试（inset=0），不行再一格格往里挪：切角/八边形
+        # 的四个角本来就被削掉了，死守墙角的话永远放不下（土楼实测 0 部）。
         cands = []
-        # 贴着内墙根走，别占房间正中间；四个角都试一遍，
-        # 总有一个角没被别的体块/窗框占掉。
-        if ix1 - ix0 + 1 >= n + 2:
-            cands.append((1, 0, ix0, iz0, 0, 1))
-            cands.append((-1, 0, ix1, iz1, 0, -1))
-        if iz1 - iz0 + 1 >= n + 2:
-            cands.append((0, 1, ix0, iz0, 1, 0))
-            cands.append((0, -1, ix1, iz1, -1, 0))
-        rnd.shuffle(cands)
+        for inset in (0, 2, 4, 6, 8, 12, 16):
+            group = []
+            if ix1 - ix0 + 1 >= n + 2 + inset * 2:
+                group.append((1, 0, ix0 + inset, iz0 + inset, 0, 1))
+                group.append((-1, 0, ix1 - inset, iz1 - inset, 0, -1))
+            if iz1 - iz0 + 1 >= n + 2 + inset * 2:
+                group.append((0, 1, ix0 + inset, iz0 + inset, 1, 0))
+                group.append((0, -1, ix1 - inset, iz1 - inset, -1, 0))
+            rnd.shuffle(group)
+            cands.extend(group)
         mat = self._wall_mat(rnd)
         for dx, dz, sx, sz, px, pz in cands:
             # 加宽是垂直于梯段的：沿 x 走就占 z 方向，反之亦然。
@@ -3356,6 +3385,9 @@ class _Builder:
                 for k in range(w):
                     x = sx + dx * i + px * k
                     z = sz + dz * i + pz * k
+                    if not v.contains(x, z):
+                        ok = False
+                        break
                     for yy in range(h, min(y1, h + 3)):
                         if self.get(x, yy, z) >= 0:
                             ok = False
@@ -3398,13 +3430,19 @@ class _Builder:
             # 这些形体一律当"整块一间"，不做室内。
             if v.aux or not v.hollow or v.taper_axis or v.slanted:
                 continue
-            if v.plan() is not None:
-                continue  # 六边形/圆/楔形：整块当一间，不做分隔
+            # 圆形平面（斗兽场、圆楼）整块当一间：直角隔墙切进圆里只剩
+            # 一串月牙，读不出房间。其余平面（L 形、六/八边形、楔形、切角）
+            # 是直边，隔墙按"格子是否在轮廓内"逐格裁一下就能用。
+            if v.shape == "round":
+                continue
             if v.w < 8 or v.d < 8:
                 continue
             levels = self._levels(v)
             if not levels:
                 continue
+            # floors 一个都没写的体块：室内设计自己补楼板（只动内部）
+            if not v.floors:
+                levels = self._derived_floors(v)
             reserved: dict[int, set] = {}
             with self.using(v):
                 for i in range(len(levels) - 1):
