@@ -337,18 +337,44 @@ export function deleteModel(project: Project, rawName: string): { removed: strin
   if (!fs.existsSync(dir)) {
     throw createError({ statusCode: 404, statusMessage: '这个项目还没有输出' })
   }
+  const entries = fs.readdirSync(dir)
+  const esc = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   const removed: string[] = []
-  // 修改版（m11_r2）是独立模型，删 m11 时不能连带删掉它。
-  // 名字里可能有正则元字符（英文句点、括号），必须转义再用。
-  const revPrefix = new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}_r\\d+`)
-  for (const entry of fs.readdirSync(dir)) {
-    if (revPrefix.test(entry)) continue
-    // m01.schematic / m01_iso.png / m01_manifest.json 都归 m01；
-    // 用 "m01_"/"m01." 精确前缀，才不会把 m010 一起删掉
-    if (entry === `${name}.schematic` || entry.startsWith(`${name}_`) || entry.startsWith(`${name}.`)) {
-      fs.rmSync(path.join(dir, entry), { force: true })
-      removed.push(entry)
+  // 修改版（m11_r2）和手工改版（m11_v2）都是**独立模型**，删 m11 时
+  // 不能连带删掉它们 —— 文件名前缀天然是包含关系（`m11_v2_iso.png`
+  // 以 `m11_` 开头），光靠 startsWith 一定会误伤。
+  const sibling = new RegExp(`^${esc}_[rv]\\d+`)
+  // 兜底：目录里别的模型的 manifest 名也算"兄弟"，前缀同样不能碰。
+  // 这一条覆盖自定义命名的改版（比如「白宫-柱廊版」），不必依赖 _vN 后缀。
+  const peers = new Set<string>()
+  for (const entry of entries) {
+    if (!entry.endsWith('_manifest.json')) continue
+    try {
+      const m = JSON.parse(fs.readFileSync(path.join(dir, entry), 'utf-8'))
+      const mn = String(m.name || entry.replace('_manifest.json', '')).trim()
+      if (mn && mn !== name) peers.add(mn)
+    } catch {
+      /* 坏清单忽略，不影响删除 */
     }
+  }
+  // 前缀天然是包含关系：`m01_v2_iso.png` 既像「m01_v2 + _iso.png」，
+  // 也像「m01 + _v2_iso.png」。所以不能问"是否以某名字开头"，
+  // 而要问"**最长的那个名字**是谁" —— 谁长就归谁。
+  const owners = [name, ...peers].sort((a, b) => b.length - a.length)
+  const ownerOf = (entry: string): string | null => {
+    for (const o of owners) {
+      const p = o.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      if (entry === `${o}.schematic`) return o
+      if (new RegExp(`^${p}[_.]`).test(entry)) return o
+    }
+    return null
+  }
+
+  for (const entry of entries) {
+    if (sibling.test(entry)) continue
+    if (ownerOf(entry) !== name) continue
+    fs.rmSync(path.join(dir, entry), { force: true })
+    removed.push(entry)
   }
   if (!removed.length) {
     throw createError({ statusCode: 404, statusMessage: '找不到这个模型' })
