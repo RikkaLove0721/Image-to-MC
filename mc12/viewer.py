@@ -49,7 +49,7 @@ def build_payload(vox: np.ndarray, blocks: list[Block], name: str) -> dict:
 
 # 模板版本：改过查看器就 +1。服务端会在取 _view.html 时比对，
 # 版本旧的就地用页面里已内联的体素数据重套一次模板（模型一格不动）。
-TEMPLATE_VERSION = "3"
+TEMPLATE_VERSION = "4"
 
 _TMPL = r"""<!DOCTYPE html>
 <html lang="zh-CN">
@@ -77,6 +77,11 @@ _TMPL = r"""<!DOCTYPE html>
   #info .qbtn.on:hover { background:#111; }
   #info .qbtn .dot { width:7px; height:7px; border-radius:50%; background:#B9B7B0; }
   #info .qbtn.on .dot { background:#7CE07C; box-shadow:0 0 0 3px rgba(124,224,124,.25); }
+  /* 右上角那行"按住 R 置顶"：只在桌面外壳里显示，浏览器里 JS 不会填字 */
+  #topbar-tip { position:absolute; top:16px; right:16px; padding:6px 10px;
+    border-radius:8px; background:rgba(44,44,42,.72); color:#fff; font-size:12px;
+    letter-spacing:.2px; pointer-events:none; opacity:0; transition:opacity .2s ease; z-index:9; }
+  #topbar-tip.on { opacity:1; }
   .li.hl { background:#FFF3C4; border-radius:6px; box-shadow:inset 0 0 0 1px rgba(0,0,0,.06); }
   .li.hl .nm { font-weight:600; }
   #legend { top:16px; right:16px; width:246px; max-height:calc(100% - 150px); overflow:auto; }
@@ -113,6 +118,7 @@ _TMPL = r"""<!DOCTYPE html>
 </style>
 </head>
 <body>
+<div id="topbar-tip"></div>
 <div id="app"></div>
 
 <div class="card" id="info">
@@ -532,6 +538,55 @@ controls.update();
     var app = document.getElementById('app');
     if (app && app.children.length === 0) document.getElementById('err').style.display = 'grid';
   }, 4000);
+</script>
+<script>
+/* 按住 R 把窗口浮到最前（方便一边看游戏一边照着盖），松开回到普通层级。
+   只有桌面外壳（pywebview）里才有窗口可控；浏览器里没有 window.pywebview，
+   这时整个功能静默降级，不报错也不弹提示。 */
+(function () {
+  var api = null;
+  var on = false;
+  function bridge() {
+    return (window.pywebview && window.pywebview.api) || null;
+  }
+  var tip = document.getElementById('topbar-tip');
+  function showTip(text, on) {
+    if (!tip) return;
+    if (text) tip.textContent = text;
+    tip.classList.toggle('on', !!on);
+  }
+  window.addEventListener('pywebviewready', function () {
+    api = bridge();
+    if (api && api.set_on_top) showTip('按住 R 置顶，松开还原', true);
+  });
+  api = bridge();
+  if (api && api.set_on_top) showTip('按住 R 置顶，松开还原', true);
+
+  function setTop(v) {
+    if (on === v) return;
+    on = v;
+    var a = api || bridge();
+    if (a && a.set_on_top) {
+      try { a.set_on_top(v); } catch (e) { /* 外壳版本旧，忽略 */ }
+    }
+    if (v) showTip('已置顶 · 松开 R 还原', true);
+    else showTip('按住 R 置顶，松开还原', true);
+  }
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'r' || e.key === 'R') {
+      if (e.target && /^(INPUT|TEXTAREA)$/.test(e.target.tagName)) return;
+      setTop(true);
+    }
+  });
+  document.addEventListener('keyup', function (e) {
+    if (e.key === 'r' || e.key === 'R') setTop(false);
+  });
+  window.addEventListener('blur', function () { setTop(false); });
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden) setTop(false);
+  });
+})();
 </script>
 </body>
 </html>

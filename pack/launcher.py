@@ -249,6 +249,29 @@ def stop_child(child: subprocess.Popen | None) -> None:
         child.kill()
 
 
+class _ViewerApi:
+    """查看器窗口的 JS 桥：只负责"置顶"一件事.
+
+    pywebview 会把 js_api 上的公开方法暴露成 window.pywebview.api.xxx()。
+    这个类故意只留一个方法 —— 查看器页面是完全独立的 HTML，不该顺手拿到
+    主窗口的保存文件、打开目录那套能力。
+    """
+
+    def __init__(self, shell: "Bridge") -> None:
+        self._shell = shell
+
+    def set_on_top(self, on: bool = True) -> dict:
+        """按住 R 置顶 / 松开还原（由查看器页面里的 keydown/keyup 调）.  """
+        win = getattr(self._shell, "_viewer", None)
+        if win is None:
+            return {"ok": False, "error": "查看器窗口已关闭"}
+        try:
+            win.on_top = bool(on)
+        except Exception as exc:  # noqa: BLE001
+            return {"ok": False, "error": str(exc)}
+        return {"ok": True, "on_top": bool(on)}
+
+
 class Bridge:
     """暴露给页面脚本的少量桌面能力."""
 
@@ -258,6 +281,8 @@ class Bridge:
         self._base = base
         self._projects = projects
         self._log = log
+        # 查看器窗口的引用（浮在最前面的那个），关掉后置 None
+        self._viewer = None
 
     def _note(self, msg: str) -> None:
         if self._log is not None:
@@ -301,18 +326,25 @@ class Bridge:
         return {"ok": True}
 
     def open_viewer(self, url: str, title: str = "") -> dict:
-        """3D 查看器开成应用内的第二个窗口, 而不是跳浏览器."""
+        """3D 查看器开成应用内的第二个窗口, 而不是跳浏览器.
+
+        窗口带一个只有置顶能力的小 API: 查看器页面里按住 R 会调
+        `set_on_top(True)`, 松开调 False —— 玩家想一边开着游戏一边照着盖,
+        窗口必须能浮在游戏上面, 松手又别一直压着别的窗口.
+        """
         if not isinstance(url, str) or not url.startswith("/api/"):
             return {"ok": False, "error": "只允许打开本程序的页面"}
         try:
-            webview.create_window(
+            win = webview.create_window(
                 str(title or "3D 查看器"),
                 f"http://127.0.0.1:{self._port}{url}",
                 width=1040,
                 height=820,
                 min_size=(720, 520),
                 text_select=True,
+                js_api=_ViewerApi(self),
             )
+            self._viewer = win
         except Exception as exc:  # noqa: BLE001
             return {"ok": False, "error": str(exc)}
         return {"ok": True}

@@ -39,14 +39,25 @@ const SCALE_DEFAULT = 2
 const scale = ref(SCALE_DEFAULT)
 
 /**
- * 游戏建筑技巧性 0/1/2（低/中/高），默认中。
- * 这不是"精细度"，是"风格取向"：高 → 优先套用 MC 社区建筑法则，
- * 允许偏离照片的逐像素还原；低 → 尽量照抄照片。
+ * 还原偏好 0/1/2（底层的 craft 是反过来的：0=贴近照片，2=社区法则）。
+ *
+ * 这一档不是"精细度"，是"风格取向"：越往右越照抄照片的结构与配色，
+ * 越往左越允许 AI 套用社区建筑法则（三色原则、开口包框、腰线分段、收分）。
+ * 界面上滑条右 = 更还原，所以这里做一次取反，别让用户读反。
  */
 const craft = ref(1)
-const CRAFT_LABEL = ['低 · 贴近照片', '中 · 还原为主', '高 · 社区法则优先']
+const restoreLevel = computed({
+  get: () => 2 - craft.value,
+  set: (v: number) => { craft.value = 2 - v },
+})
+const RESTORE_LABEL = ['自由发挥 · 社区法则', '平衡 · 结构照抄', '严格还原 · 逐处照照片']
 const detailLevel = ref(2)
-const DETAIL_LABEL: Record<number, string> = { 1: '基础', 2: '标准', 3: '精细' }
+const DETAIL_LABEL: Record<number, string> = {
+  1: '基础',
+  2: '标准',
+  3: '精细',
+  4: '观赏性细节',
+}
 
 /**
  * 结构数量 1~5：建筑由几个部分组成。
@@ -529,8 +540,15 @@ async function buildPlan() {
 function startTimers() {
   stopTimers()
   const began = Date.now()
+  let nudged = 0
   tickTimer = setInterval(() => {
     elapsed.value = Math.floor((Date.now() - began) / 1000)
+    // 砌了 12 秒、26 秒各搭一句话，顺便让她再摇一次头 ——
+    // 长模型要跑半分钟，全程只有"开始"和"完成"两句会显得很冷清。
+    if ((elapsed.value === 12 || elapsed.value === 26) && nudged < 2) {
+      nudged += 1
+      xiaocTell('build-running', { elapsed: elapsed.value })
+    }
   }, 1000)
   poll()
 }
@@ -678,13 +696,21 @@ watch(log, scrollLog)
             </div>
           </div>
           <div class="field">
-            <label class="field-label">细节等级</label>
-            <select v-model.number="detailLevel" class="select">
-              <option :value="1">基础（小尺寸）</option>
-              <option :value="2">标准</option>
-              <option :value="3">精细（大模型）</option>
-              <option :value="4">观赏性细节（社区级）</option>
-            </select>
+            <label class="field-label" style="display: flex; align-items: center; gap: 8px">
+              细节等级
+              <b style="color: var(--brand-deep)">{{ DETAIL_LABEL[detailLevel] }}</b>
+            </label>
+            <input
+              v-model.number="detailLevel"
+              type="range"
+              min="1"
+              max="4"
+              step="1"
+              class="scale-slider"
+            />
+            <div class="scale-ticks">
+              <span>基础</span><span>标准</span><span>精细</span><span>观赏</span>
+            </div>
           </div>
           <div class="field" style="grid-column: 1 / -1">
             <label class="field-label" style="display: flex; align-items: center; gap: 8px">
@@ -714,11 +740,11 @@ watch(log, scrollLog)
           </div>
           <div class="field" style="grid-column: 1 / -1">
             <label class="field-label" style="display: flex; align-items: center; gap: 8px">
-              游戏建筑技巧性
-              <b style="color: var(--brand-deep)">{{ CRAFT_LABEL[craft] }}</b>
+              还原偏好
+              <b style="color: var(--brand-deep)">{{ RESTORE_LABEL[restoreLevel] }}</b>
             </label>
             <input
-              v-model.number="craft"
+              v-model.number="restoreLevel"
               type="range"
               min="0"
               max="2"
@@ -726,14 +752,14 @@ watch(log, scrollLog)
               class="scale-slider"
             />
             <div class="scale-ticks">
-              <span>低 · 贴近照片</span><span>中 · 默认</span><span>高 · 社区法则</span>
+              <span>自由发挥</span><span>平衡</span><span>严格还原</span>
             </div>
             <div class="fusion-note" style="margin-top: 8px">
               <UiIcon name="info" :size="14" />
               <span>
-                这一档决定 AI 在"还原照片"和"像社区大神的作品"之间怎么取舍：
-                调高会优先套用三色原则、开口包框、腰线分段、收分这些形式法则，
-                允许改配色和开间节奏；调低则尽量照抄照片的结构与配色。
+                这一档决定 AI 在"照抄照片"和"像社区大神的作品"之间怎么取舍：
+                越往右越照抄照片的结构与配色；越往左越优先套用三色原则、开口包框、
+                腰线分段、收分这些形式法则，允许改配色和开间节奏。
                 <b>层数、比例尺仍以照片为准</b>，层数需要强制指定时写进「补充要求」。
               </span>
             </div>

@@ -25,7 +25,7 @@
  */
 type SayKind =
   | 'hello' | 'idle' | 'idle-night' | 'click' | 'drag'
-  | 'build-start' | 'build-done' | 'build-fail'
+  | 'build-start' | 'build-running' | 'build-done' | 'build-fail'
   | 'plan-start' | 'plan-done' | 'plan-fail'
   | 'viewer-open' | 'view-change' | 'model-select'
   | 'hide' | 'restore'
@@ -39,6 +39,8 @@ const COOLDOWN: Partial<Record<SayKind, number>> = {
   click: 2500,
   'plan-start': 20000,
   'build-start': 20000,
+  // 生成中那句只在 12s / 26s 各发一次，冷却给短一点，不然第二句会被吞掉
+  'build-running': 9000,
   'build-done': 1500,
 }
 /** 剧情性最强的几句，可以打断正在显示的普通台词 */
@@ -58,6 +60,9 @@ const zoomPct = ref(100)
 /** 眨眼：闭眼层叠上来再撤掉，间隔模拟 Live2D 的 3.5s ± 1.2s */
 const blinking = ref(false)
 const bubble = ref('')
+/** 产图时的"慢慢摇头"：绕臀部小幅左右摆，2.4 秒衰减到停 */
+const shaking = ref(false)
+let shakeTimer: ReturnType<typeof setTimeout> | null = null
 const dragging = ref(false)
 /** 相对右下角的偏移：默认贴右下角，拖过之后记住新位置 */
 const pos = reactive({ x: 0, y: 0 })
@@ -117,7 +122,22 @@ function onTell(e: Event) {
   if (hidden.value) return
   const d = (e as CustomEvent).detail || {}
   if (!d.kind) return
+  // 开砌 / 画蓝图的时候慢慢摇头：像在"嗯……让我看看"。
+  // 只有这两类事件摇，正常待机不摇 —— 一直晃会显得焦躁。
+  if (d.kind === 'build-start' || d.kind === 'plan-start' || d.kind === 'build-running') {
+    headshake()
+  }
   say(undefined, d.kind as SayKind, d.ctx || {})
+}
+
+function headshake() {
+  shaking.value = false
+  if (shakeTimer) clearTimeout(shakeTimer)
+  // 先关再开，才能让同一个动画重新播（class 不变的话浏览器不会重启动画）
+  requestAnimationFrame(() => {
+    shaking.value = true
+    shakeTimer = setTimeout(() => (shaking.value = false), 2400)
+  })
 }
 
 /** 随机搭话：平均 30 秒一次，浮动 ±6 秒，避免像定时器一样准点 */
@@ -289,7 +309,7 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', onDocDown))
       <div class="xiaoc-body">
         <!-- 方块是"她坐的东西"，必须完全静止 -->
         <img class="xiaoc-block" src="/xiaoc/block.png" alt="" draggable="false" />
-        <div class="xiaoc-figure" :class="{ blinking }">
+        <div class="xiaoc-figure" :class="{ blinking, shaking }">
           <img class="xiaoc-bodyimg" src="/xiaoc/xiaoc-body.png" alt="小C" draggable="false" />
           <img class="xiaoc-legs" src="/xiaoc/xiaoc-legs.png" alt="" draggable="false" />
           <img class="xiaoc-eye" src="/xiaoc/xiaoc-eye.png" alt="" draggable="false" />
@@ -372,6 +392,22 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', onDocDown))
   translate: calc(var(--px) * -1.6px) calc(var(--py) * -1px);
   transition: translate 0.35s ease-out;
   filter: drop-shadow(0 3px 4px rgba(24, 42, 80, 0.12));
+}
+
+/* 摇头：用独立的 `rotate` 属性，和 breathe 的 transform 互不覆盖。
+   绕的是臀部（62%），所以看起来是上半身慢慢左右晃，而不是整张图在平移。 */
+.xiaoc-figure.shaking {
+  animation:
+    xiaoc-breathe 5.2s ease-in-out infinite,
+    xiaoc-shake 1.2s ease-in-out 2;
+}
+
+@keyframes xiaoc-shake {
+  0% { rotate: 0deg; }
+  22% { rotate: -2.6deg; }
+  50% { rotate: 2.6deg; }
+  76% { rotate: -1.6deg; }
+  100% { rotate: 0deg; }
 }
 
 .xiaoc-bodyimg {

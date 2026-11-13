@@ -16,18 +16,6 @@ import { startJob } from '../../../../utils/jobs'
  * 命名：`m09` → `m09_r2` → `m09_r3`，可以一直改下去。
  */
 
-const KEEP_FIELDS = [
-  'subject',
-  'scale',
-  'seed',
-  'target_width',
-  'target_height',
-  'aspect',
-  'detail',
-  'ornament',
-  'complete',
-]
-
 /** 第几次修改：从 r2 开始数（r1 就是原版） */
 function nextRev(dir: string, base: string): { name: string; n: number } {
   let n = 2
@@ -93,9 +81,11 @@ export default defineEventHandler(async (event) => {
 
   const system =
     '你是一个 Minecraft 建筑蓝图的"修改器"。用户对上一版结果不满意，' +
-    '你只需要按他的意见改这一份蓝图，不要重新设计。\n' +
+    '你按他的意见改这一份蓝图。\n' +
     '硬性要求：\n' +
-    '1. 只改用户点到的地方；他没提的字段全部原样保留（体块坐标、层数、比例、seed 都不要动）。\n' +
+    '1. **以用户的意见为准**。他要求改什么就改什么，包括比例、层数、体块数量、' +
+    '   尺寸、细节等级、配色 —— 这些都可以动。没提到的部分尽量保留原样，' +
+    '   但如果新的要求与之冲突（比如"太矮了要加两层"就该动层数），以要求为准。\n' +
     '2. 输出**完整的** JSON 对象（不是 diff、不是片段），字段结构与原蓝图完全一致。\n' +
     '3. 不要输出解释文字，不要用 markdown 代码块。\n' +
     '3b. **不要缩进、不要换行对齐**：紧凑的 JSON 一样合法，缩进会把输出撑到被截断。\n' +
@@ -105,7 +95,7 @@ export default defineEventHandler(async (event) => {
     '    用户说"更斜一点"就是加大 lean 的格数；说"斜向另一边"就是改符号；' +
     '    说"一层不是方的"就是给底层加 shape；说"两个方向都斜"就是 x 和 z 都给。\n' +
     '5. 玻璃默认是玻璃板；整块玻璃要写 "thick": true（玻璃天花板/厚玻璃才用）。\n' +
-    `6. 这些字段不要改：${KEEP_FIELDS.join(', ')}。`
+    '6. `seed` 保留原值即可（它只影响观赏性细节的随机分布，不是设计参数）。'
 
   const user =
     (facts ? `【上一版的分析记录】\n${facts}\n\n` : '') +
@@ -148,12 +138,15 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  // 把"不该改"的字段钉回原值：模型经常顺手把 seed / 尺寸重写一遍
-  for (const k of KEEP_FIELDS) {
-    if (prev[k] !== undefined) next[k] = prev[k]
-  }
-  // 形体字段（shape / lean / skew）同样要钉：用户只让改颜色，
+  // seed 只影响观赏性细节的随机分布，不是设计参数：模型常常忘了带、
+  // 或者顺手重写一遍，这里统一钉回原值，保证"同一版再改一次"不会
+  // 因为细节重新洗牌而看不出改了哪儿。其余字段一律听 AI 的 ——
+  // 用户要的是"完全自由的修改"，把比例/层数/尺寸钉死会让"太矮，加两层"
+  // 这种要求直接失效。
+  if (prev.seed !== undefined) next.seed = prev.seed
+  // 形体字段（shape / lean / skew）仍然兜一层：用户只让改颜色，
   // 结果斜的那一层变回方块 —— 这是"改完反而退步"的常见原因。
+  // 但它只是"补空缺 + 校正方向"，不会把用户明确要求改的形体拉回去。
   const pinned = pinShape(next, prev)
   const enforced = [...enforceTilt(next, analysis?.vision), ...enforceShape(next, analysis?.vision)]
   if (pinned.length || enforced.length) {

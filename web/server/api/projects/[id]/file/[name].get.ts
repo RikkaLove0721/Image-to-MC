@@ -10,7 +10,7 @@ import { runCore } from '../../../../utils/core'
  * 所以取文件时比对一下标记，版本旧的就让后端**就地换壳**：
  * 复用页面里已内联的体素数据重新套模板，模型一格不动。
  */
-const VIEWER_TEMPLATE = '3'
+const VIEWER_TEMPLATE = '4'
 
 const TYPES: Record<string, string> = {
   '.png': 'image/png',

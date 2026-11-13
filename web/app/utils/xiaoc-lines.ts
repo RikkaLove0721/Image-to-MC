@@ -16,6 +16,7 @@ export type XiaoCKind =
   | 'click'
   | 'drag'
   | 'build-start'
+  | 'build-running'
   | 'build-done'
   | 'build-fail'
   | 'plan-start'
@@ -86,6 +87,19 @@ export const XIAOC_LINES: Record<XiaoCKind, Line[]> = {
     fixed('砖要落了。'),
     fixed('这个尺寸……有点意思。'),
     fixed('我不催你，机器也不催。'),
+    fixed('先摆体块，再开窗。别急。'),
+    fixed('这栋的角，得慢慢找。'),
+    fixed('我把图纸看了一遍。开始吧。'),
+    fixed('灰要起来了，往后退半步。'),
+    fixed('一块一块来，急不出来的。'),
+  ],
+
+  'build-running': [
+    fixed('还在砌。第二层了。'),
+    fixed('别晃鼠标，我在对窗。'),
+    fixed('这一段有点难，稍等。'),
+    fixed('快了。屋角收完就好。'),
+    fixed('方块数在涨。正常。'),
   ],
 
   'build-done': [
