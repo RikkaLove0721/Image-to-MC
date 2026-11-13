@@ -354,6 +354,7 @@
 - `web/nuxt.config.ts`: 端口之外的界面配置, 构建时把 VERSION 注入 runtimeConfig
 - `web/server/utils/store.ts`: 项目根目录探测, 项目元信息结构, 产物文件名映射
 - `web/server/utils/jobs.ts`: 允许的重建路线与预设, 数值参数限幅, Python 解释器
+- `web/server/utils/update.ts`: 应用内更新, 更新源仓库常量, 查版本(三源取最大), 暂存/校验/覆盖脚本
 - `web/app/utils/site.ts`: 作者与项目名常量, 页脚引用
 - `mc12/palette.py`: 方块表与去重优先级, 影响配色观感, 改动前需确认 1.12.2 存在性
 - `run.py` 顶部的 `PRESETS`: 宽度预设与方块种类上限

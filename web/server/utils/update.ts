@@ -141,13 +141,15 @@ export async function checkUpdate(force = false): Promise<ReleaseInfo> {
     }
   }
 
-  // 主路径：直接读仓库里的 VERSION（raw.githubusercontent 走 CDN，不占 API 配额）。
+  // 主路径：直接读仓库里的 VERSION（raw / jsDelivr 都走 CDN，不占 API 配额）。
   // 之前只用 /releases/latest，同一个出口 IP 上一堆人用软件就会吃 403 ——
   // 而"有没有新版本"这件事，一个纯文本文件就够了。
   const raw = await latestFromSources()
   const api = await latestFromApi()
 
-  const latest = raw || api?.latest || null
+  // 三处都可能给出值，取最大的：CDN 有缓存（按节点、最长 12 小时），
+  // API 是实时的但会被限流。只要有一路是新的，就不会把更新藏起来。
+  const latest = [raw, api?.latest].filter(Boolean).sort((a, b) => compareVersion(b!, a!))[0] || null
   if (!latest) {
     return {
       ...base,
