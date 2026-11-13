@@ -283,6 +283,8 @@ class Bridge:
         self._log = log
         # 查看器窗口的引用（浮在最前面的那个），关掉后置 None
         self._viewer = None
+        # 主窗口引用：更新装完后要用它自杀（页面里调 quit_app）
+        self._window = None
 
     def _note(self, msg: str) -> None:
         if self._log is not None:
@@ -295,6 +297,27 @@ class Bridge:
             "projectsDir": str(self._projects),
             "port": self._port,
         }
+
+    def quit_app(self) -> dict:
+        """让软件自己退出（应用内更新装完后由页面调用）。
+
+        必须**先回包再关窗**：pywebview 的 JS 桥是同步等待返回值的，
+        在同一个调用里 destroy 窗口，页面会永远等不到结果。
+        所以起一个 0.5 秒的定时器，把销毁推到回包之后。
+        """
+        win = self._window
+        if win is None:
+            return {"ok": False, "error": "窗口还没准备好"}
+        self._note("页面请求退出（准备覆盖更新）")
+
+        def _bye() -> None:
+            try:
+                win.destroy()
+            except Exception as exc:  # noqa: BLE001
+                self._note(f"关窗失败: {type(exc).__name__}: {exc}")
+
+        threading.Timer(0.5, _bye).start()
+        return {"ok": True}
 
     def save_file(self, url: str, filename: str) -> dict:
         """把产物另存到用户选的位置. url 只接受本机的 /api/ 路径."""
@@ -508,6 +531,7 @@ def main() -> int:
         background_color="#0f1419",
         maximized=maximize,
     )
+    bridge._window = window
 
     state: dict = {"child": None, "error": ""}
 

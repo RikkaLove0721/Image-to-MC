@@ -198,6 +198,32 @@ python run.py --spec 蓝图.json -o output --name 我的楼
 右下角是界面助手**小C**：左键点她弹设置（大小、关闭），她会在生成完成、失败、
 第一次打开这些时刻说不同的话。不想要可以关掉，不影响任何功能。
 
+首页右上角是**设置**（`/settings`），左边两个主选项：
+
+| 选项 | 内容 |
+| --- | --- |
+| 使用说明 | 就是上面这套上手流程，按「开始 / 拍照 / 设置 / AI / 查看器 / 导出 / 方块库 / FAQ」分节 |
+| 检测更新 | 当前版本与安装目录 → 检测 GitHub 上有没有新版本 → 一键下载并覆盖安装 |
+
+### 应用内更新怎么做的
+
+更新源是本仓库的 GitHub Release。检查更新读的是仓库里的 `VERSION`
+（jsDelivr / raw / API 三个源取最大值，绕开国内直连不通与 60 次/小时限流），
+下载用的是 `releases/download/v<版本>/MC12-Studio-v<版本>-win64.zip`。
+
+分两步，任何一步失败都不动现有安装：
+
+1. **暂存**：下载到 `<安装目录>/update/`，用 .NET `ZipFile` 解压（PS 5.1 的
+   `Expand-Archive` 会把中文文件名解成乱码），校验有 `runtime/server/index.mjs`、
+   包里 `VERSION` 比当前新，才算"就绪"。
+2. **覆盖**：写一个纯 ASCII 的批处理到 `%TEMP%`，`start` 成孤儿进程后让页面调用
+   `quit_app` 退出。脚本等旧进程死透（8 秒不退就 `taskkill /T /F`），再用
+   `robocopy /E` 覆盖，**排除 `projects` / `logs` / `ai.json` / `vision-probe.json`**，
+   最后把 exe 重新拉起来。日志写在 `<安装目录>/logs/update.log`。
+
+批处理必须是纯 ASCII：cmd 默认代码页是 936，UTF-8 的中文注释会让整段解析错位。
+中文路径与 `MC工程图.exe` 一律作为参数传进去，不写进脚本正文。
+
 ## 功能
 
 - **多视角建模**：正/侧/俯/自由四种角色，最多四张；支持拖拽与剪贴板粘贴（Ctrl+V）

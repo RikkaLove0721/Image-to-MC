@@ -10,8 +10,6 @@ interface ProjectRow {
 }
 
 const version = useRuntimeConfig().public.version as string
-/** 使用说明弹窗 */
-const helpOpen = ref(false)
 
 const { data, pending, refresh, error } = await useAsyncData('projects', () =>
   $fetch<{ projects: ProjectRow[] }>('/api/projects'),
@@ -210,9 +208,9 @@ function openProject(project: ProjectRow) {
         <div class="topbar-spacer" />
         <span class="badge">v{{ version }}</span>
         <span class="badge brand">Java 1.12.2</span>
-        <button class="btn" @click="helpOpen = true">
-          <UiIcon name="info" :size="15" /> 使用说明
-        </button>
+        <NuxtLink to="/settings" class="btn">
+          <UiIcon name="info" :size="15" /> 设置
+        </NuxtLink>
         <button class="btn primary" @click="openCreate">
           <UiIcon name="plus" :size="16" /> 新建项目
         </button>
@@ -235,9 +233,9 @@ function openProject(project: ProjectRow) {
             <button class="btn primary" @click="openCreate">
               <UiIcon name="plus" :size="16" /> 新建项目
             </button>
-            <button class="btn ghost" @click="helpOpen = true">
+            <NuxtLink class="btn ghost" to="/settings?tab=help">
               <UiIcon name="info" :size="16" /> 第一次用？看说明
-            </button>
+            </NuxtLink>
             <a class="btn ghost" href="#projects">
               <UiIcon name="folder" :size="16" /> 已有项目 {{ projects.length }}
             </a>
@@ -437,8 +435,6 @@ function openProject(project: ProjectRow) {
         <button class="btn primary" :disabled="renameBusy" @click="submitRename">保存</button>
       </template>
     </AppModal>
-
-    <HelpDialog :open="helpOpen" @close="helpOpen = false" />
 
     <Transition name="fade">
       <div v-if="toast" class="toast" :class="{ err: toast.type === 'err' }">
