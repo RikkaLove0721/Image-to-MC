@@ -325,7 +325,11 @@ def analyze(path: str, width: int = 40) -> dict:
     lit = region & (warm > 0.0) & ~green
     if lit.sum() < 25:
         lit = region
-    hi_lum = np.percentile(lum[lit], 55)
+    # 取 80 分位而不是 55：55 分位落在"整片立面的平均亮度"上，而 40 格宽的
+    # 采样格会把暗窗、阴影、路面一起平均进去 —— 米黄色石灰岩量出来是 (157,148,143)
+    # 这种中灰，最近色就成了 concrete:8（灰蓝混凝土），整栋楼变成灰盒子。
+    # 受光面在 80 分位附近，白墙才会被判成 quartz。
+    hi_lum = np.percentile(lum[lit], 80)
     wall_px = rgb[lit & (lum >= hi_lum)]
     if wall_px.shape[0] < 10:
         wall_px = rgb[lit]

@@ -361,3 +361,37 @@ export function pinShape(next: any, prev: any): string[] {
   }
   return notes
 }
+
+/* ------------------------------------------------------------------ 配色兜底 */
+
+/**
+ * 白石头建筑被 AI 写成灰盒子时的兜底。
+ *
+ * 照片量出来的墙色是"近白石材"（analyze 的 palette.wall = quartz_block），
+ * 但 AI 有时候会自己改成 concrete:8（浅灰蓝混凝土）或 stone —— 哥特教堂、
+ * 白宫、希腊柱廊这类建筑一旦变成灰色，观感立刻从"米黄石头"掉到"水泥盒子"，
+ * 用户第一眼看到的就是"颜色错了"。
+ *
+ * 只处理这一种错配：量出来是白的、AI 写成灰的。反过来（照片是灰的、AI 写白）
+ * 不碰，那多半是 AI 读到了设计意图（比如现代建筑的白墙）。
+ */
+export function fixWallPalette(spec: any, briefPalette: any, hint: string): string[] {
+  const notes: string[] = []
+  const pal = spec?.palette
+  if (!pal || typeof pal !== 'object') return notes
+
+  const want = String(briefPalette?.wall || '').trim()
+  const got = String(pal.wall || '').trim()
+  if (!want || !got || want === got) return notes
+  // 用户点名要什么色 / 什么料时，以他为准
+  if (/[白米浅灰黑红黄蓝绿棕金]|石|砖|木|玻璃|混凝土|石英|砂岩/.test(hint || '')) return notes
+
+  const whiteish = /^(quartz_block|smooth_quartz|concrete:0|snow|white_wool|diorite)/i
+  const grayish =
+    /^(concrete:[6-9]|stone$|stonebrick|cobblestone|smooth_stone|hardened_clay|stained_hardened_clay:(7|8|9|15)|andesite)/i
+  if (!whiteish.test(want) || !grayish.test(got)) return notes
+
+  pal.wall = want
+  notes.push(`墙色 ${got} → ${want}：照片量出来是近白石材`)
+  return notes
+}

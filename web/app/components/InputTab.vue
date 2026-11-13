@@ -13,6 +13,8 @@ const props = defineProps<{
     craft?: number
     complexity?: number
     hint?: string
+    /** 模型总宽（格）。0/缺省 = 自动 */
+    modelWidth?: number
     width?: number
   } | null
 }>()
@@ -68,6 +70,17 @@ const DETAIL_LABEL: Record<number, string> = {
  * 所以这一档不由 AI 写，交给构建器按规则长（见 mc12/spec.py 的 _grow_volumes）。
  */
 const complexity = ref(2)
+/**
+ * 模型总宽（格）。0 = 自动。
+ *
+ * 自动那条路是「AI 估米数 × 比例尺」，而 AI 估米数经常只有实际的一半
+ * （巴黎圣母院西立面 41 米被估成 18 米 → 36 格宽的哥特教堂），
+ * 于是用户看到的是"小教堂"而不是"大教堂"。给几个直接的档位，
+ * 让用户能一句话把楼定大，不用靠反复试比例尺。
+ */
+const modelWidth = ref(0)
+const WIDTH_PRESETS = [0, 48, 80, 112, 132]
+
 const COMPLEXITY_LABEL: Record<number, string> = {
   1: '简易 · 只有主体',
   2: '基本 · 两角塔',
@@ -299,6 +312,7 @@ function persistSettings() {
         detail: detailLevel.value,
         craft: craft.value,
         complexity: complexity.value,
+        modelWidth: modelWidth.value,
         hint: aiCfg.hint,
       },
     }).catch(() => {
@@ -307,7 +321,7 @@ function persistSettings() {
   }, 500)
 }
 
-watch([scale, detailLevel, craft, complexity, () => aiCfg.hint], persistSettings)
+watch([scale, detailLevel, craft, complexity, modelWidth, () => aiCfg.hint], persistSettings)
 
 /* ---- AI 配置与出图 ---- */
 
@@ -337,6 +351,7 @@ onMounted(async () => {
     if (typeof st.detail === 'number') detailLevel.value = Math.min(4, Math.max(1, Math.round(st.detail)))
     if (typeof st.craft === 'number') craft.value = Math.min(2, Math.max(0, Math.round(st.craft)))
     if (typeof st.complexity === 'number') complexity.value = Math.min(5, Math.max(1, Math.round(st.complexity)))
+    if (typeof st.modelWidth === 'number') modelWidth.value = Math.max(0, Math.min(132, Math.round(st.modelWidth)))
     if (typeof st.hint === 'string') aiCfg.hint = st.hint
   }
   // 灌完之后放开写入：否则一进项目就把同样的值再写一遍，
@@ -437,6 +452,7 @@ async function makePlan() {
         detail: detailLevel.value,
         craft: craft.value,
         complexity: complexity.value,
+        targetWidth: modelWidth.value || undefined,
         hint: aiCfg.hint,
       },
     })
@@ -735,6 +751,32 @@ watch(log, scrollLog)
                 照片里的楼通常有几十个组成部分，而 AI 一次只写得动三五个体块，
                 所以这一档不让 AI 写 —— 由构建器按主体轮廓往外长。
                 <b>调高会让轮廓更碎、方块更多</b>，简易档则是干净的现代体块。
+              </span>
+            </div>
+          </div>
+          <div class="field" style="grid-column: 1 / -1">
+            <label class="field-label" style="display: flex; align-items: center; gap: 8px">
+              模型宽度
+              <b style="color: var(--brand-deep)">{{ modelWidth ? `${modelWidth} 格` : '自动' }}</b>
+            </label>
+            <div class="chips">
+              <button
+                v-for="w in WIDTH_PRESETS"
+                :key="w"
+                class="chip"
+                :class="{ active: modelWidth === w }"
+                @click="modelWidth = w"
+              >
+                {{ w ? `${w} 格` : '自动' }}
+              </button>
+            </div>
+            <div class="fusion-note" style="margin-top: 8px">
+              <UiIcon name="info" :size="14" />
+              <span>
+                模型最宽多少格。默认「自动」= AI 估的米数 × 比例尺，但 AI 估尺寸经常偏小
+                （一座 41 米宽的大教堂被估成 18 米，出来只有 36 格，玫瑰窗都挖不出来）。
+                <b>大教堂、宫殿、公共建筑直接选 112 或 132</b>；小住宅、亭子选 48 就够。
+                改完重新生成一次蓝图，AI 会按这个总宽排开间。
               </span>
             </div>
           </div>

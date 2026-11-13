@@ -261,15 +261,43 @@ class _ViewerApi:
         self._shell = shell
 
     def set_on_top(self, on: bool = True) -> dict:
-        """按住 R 置顶 / 松开还原（由查看器页面里的 keydown/keyup 调）.  """
+        """按住 R 置顶 / 松开还原（由查看器页面里的 keydown/keyup 调）.
+
+        **不能用 `window.on_top`**：pywebview 6 只给 cocoa / gtk / qt / android
+        实现了 `set_on_top`，Windows 的 winforms/edgechromium 后端压根没有这个方法。
+        所以在 Windows 上 `win.on_top = True` 是个静默空操作 —— 页面以为成功了，
+        用户按 R 什么都不会发生（第一版就是这么翻车的）。
+
+        这里直接拿 HWND 调 SetWindowPos：SetWindowPos 本身跨线程安全，
+        不用 WinForms 的 Invoke，也就不受"JS 桥跑在别的线程"影响。
+        """
         win = getattr(self._shell, "_viewer", None)
         if win is None:
             return {"ok": False, "error": "查看器窗口已关闭"}
+
+        if os.name != "nt":
+            try:
+                win.on_top = bool(on)
+                return {"ok": True, "on_top": bool(on)}
+            except Exception as exc:  # noqa: BLE001
+                return {"ok": False, "error": str(exc)}
+
+        # winforms 后端在创建窗口时写了 window.native = Form，Handle 就是 HWND
         try:
-            win.on_top = bool(on)
+            hwnd = int(win.native.Handle)
         except Exception as exc:  # noqa: BLE001
-            return {"ok": False, "error": str(exc)}
-        return {"ok": True, "on_top": bool(on)}
+            return {"ok": False, "error": f"拿不到窗口句柄：{exc}"}
+
+        HWND_TOPMOST, HWND_NOTOPMOST = -1, -2
+        SWP_NOMOVE, SWP_NOSIZE, SWP_NOACTIVATE = 0x0002, 0x0001, 0x0010
+        ok = ctypes.windll.user32.SetWindowPos(
+            hwnd,
+            HWND_TOPMOST if on else HWND_NOTOPMOST,
+            0, 0, 0, 0,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE,
+        )
+        self._shell._note(f"查看器置顶 → {bool(on)}（SetWindowPos={ok}, hwnd={hwnd}）")
+        return {"ok": bool(ok), "on_top": bool(on)}
 
 
 class Bridge:

@@ -78,6 +78,7 @@ const prog = ref<Progress>({ phase: 'idle', pct: 0, message: '' })
 const starting = ref(false)
 const installing = ref(false)
 const restarting = ref(false)
+const postponed = ref(false)
 const actionError = ref('')
 let timer: ReturnType<typeof setInterval> | null = null
 
@@ -119,6 +120,7 @@ async function startDownload() {
 
 async function cancel() {
   actionError.value = ''
+  postponed.value = false
   try {
     prog.value = await $fetch<Progress>('/api/update/cancel', { method: 'POST' })
   } catch (err: any) {
@@ -270,7 +272,7 @@ watch(tab, (t) => {
               </div>
               <div class="kv">
                 <span class="k">运行方式</span>
-                <span class="v">{{ info?.desktop ? '桌面版（可自动覆盖）' : '浏览器 / 开发模式（只能查看版本）' }}</span>
+                <span class="v">{{ info?.desktop ? '桌面版（可覆盖安装）' : '浏览器 / 开发模式（只能查看版本）' }}</span>
               </div>
               <div class="kv">
                 <span class="k">更新源</span>
@@ -294,7 +296,7 @@ watch(tab, (t) => {
             <div class="s-card-body">
               <p v-if="checkError" class="s-msg err">{{ checkError }}</p>
               <template v-else-if="!checked">
-                <p class="s-msg">点右上角「检测更新」查一下 GitHub 上有没有新版本。</p>
+                <p class="s-msg">点右上角「检测更新」查一下 GitHub 上有没有新版本 —— 只查版本，不会下载也不会安装。</p>
               </template>
               <template v-else-if="info?.hasUpdate">
                 <p class="s-msg ok">
@@ -313,10 +315,10 @@ watch(tab, (t) => {
             </div>
           </div>
 
-          <!-- 3. 自动更新覆盖 -->
+          <!-- 3. 下载与安装（两步都要你自己点，不会偷偷更新） -->
           <div class="card s-card">
             <div class="s-card-head">
-              <div class="s-card-title">自动更新覆盖</div>
+              <div class="s-card-title">下载并安装（可选）</div>
               <button
                 v-if="info?.hasUpdate && !busy && !ready && !failed && prog.phase !== 'installing'"
                 class="btn sm primary"
@@ -324,13 +326,14 @@ watch(tab, (t) => {
                 @click="startDownload"
               >
                 <UiIcon name="download" :size="14" />
-                {{ starting ? '准备中…' : '下载并安装' }}
+                {{ starting ? '准备中…' : '下载更新包' }}
               </button>
             </div>
             <div class="s-card-body">
               <p class="s-msg">
-                下载完成后会先解压到安装目录的 <code>update</code> 暂存区，校验通过才覆盖。
-                <b>projects / logs / ai.json 不会被覆盖，也不会被删除。</b>
+                <b>这一步不会自动触发。</b>上面「检测更新」只查版本号，不下载也不安装；
+                想要新版本才点这里的按钮，而且还要再点一次「立即安装重启」才会真正覆盖。
+                不想现在更新就关掉这个页面，旧版本照常能用。
               </p>
 
               <div v-if="busy || ready || prog.phase === 'installing'" class="prog">
@@ -341,11 +344,17 @@ watch(tab, (t) => {
                 </div>
               </div>
 
-              <div v-if="ready" class="s-actions">
+              <div v-if="ready && !postponed" class="s-actions">
                 <button class="btn sm primary" :disabled="installing" @click="doInstall">
-                  <UiIcon name="check" :size="14" /> 重启并完成更新
+                  <UiIcon name="check" :size="14" /> 立即安装并重启
                 </button>
-                <button class="btn sm ghost" @click="cancel">取消，删掉暂存的包</button>
+                <button class="btn sm ghost" @click="postponed = true">稍后（包先留着）</button>
+              </div>
+
+              <div v-if="ready && postponed" class="s-actions">
+                <span class="s-msg dim" style="margin-right: 4px">已下载好，随时回来点安装</span>
+                <button class="btn sm primary" :disabled="installing" @click="doInstall">立即安装并重启</button>
+                <button class="btn sm ghost" @click="cancel">删掉下载包</button>
               </div>
 
               <p v-if="failed" class="s-msg err">
@@ -353,6 +362,12 @@ watch(tab, (t) => {
                 <span class="dim">{{ prog.error }}</span>
               </p>
               <p v-if="actionError" class="s-msg err">{{ actionError }}</p>
+
+              <p class="s-msg dim">
+                安装只替换程序本体：下载先解压到安装目录的 <code>update</code> 暂存区，
+                校验通过才覆盖。<b>projects / logs / ai.json 不覆盖、不删除</b>，
+                你的项目和模型一个都不会动。
+              </p>
 
               <p v-if="!info?.desktop" class="s-msg dim">
                 当前不是从 exe 启动的，覆盖安装只对桌面版生效。开发模式下请用仓库里的

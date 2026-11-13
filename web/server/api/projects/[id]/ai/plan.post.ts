@@ -4,7 +4,7 @@ import { projectDir, readProject } from '../../../../utils/store'
 import { runCore, runCoreJson } from '../../../../utils/core'
 import { addUsage, chat, ensureVision, parseJsonLoose, type TokenUsage } from '../../../../utils/ai'
 import { readPhoto, diffRender, readingNote } from '../../../../utils/vision'
-import { enforceShape, enforceTilt } from '../../../../utils/geometry'
+import { enforceShape, enforceTilt, fixWallPalette } from '../../../../utils/geometry'
 
 /**
  * spec 写法说明：这段是给模型的"格式契约"。
@@ -163,7 +163,12 @@ export default defineEventHandler(async (event) => {
   if (!front) throw createError({ statusCode: 400, statusMessage: '先上传正视图' })
 
   const photo = path.join(projectDir(id), 'images', front.file)
-  const width = String(Math.min(132, Math.max(16, Number(body.width) || 40)))
+  // 用户显式指定的"模型总宽（格）"。0 / 未传 = 自动（按 AI 估的米数 × 比例尺）。
+  // 这一项存在的原因是：AI 估米数经常只有实际的一半，巴黎圣母院西立面 41 米被估成
+  // 18 米，乘 2 格/米就是 36 格 —— 36 格宽的哥特教堂连玫瑰窗都挖不出来，
+  // 出来是个灰盒子。给用户一个直接拧的旋钮，比继续猜米数靠谱。
+  const forcedW = Math.round(Number(body.targetWidth) || 0)
+  const width = String(Math.min(132, Math.max(16, forcedW || Number(body.width) || 40)))
   // 游戏建筑技巧性：0 低（尽量还原照片）/ 1 中（默认）/ 2 高（优先社区法则）
   const craft = Math.max(0, Math.min(2, Math.round(Number(body.craft ?? 1) || 0)))
   const brief = runCoreJson<any>(['--brief', '-i', photo, '--width', width])
@@ -727,7 +732,8 @@ export default defineEventHandler(async (event) => {
   const rawW = Math.max(isShip ? 40 : 16, Math.round(mainMeters * scale))
   // 补全的宽度**不在这里乘**：蓝图已经是按"整栋"设计的，再乘一遍等于
   // 把每个开间拉宽一倍（补全变成放大）。比例只用来写要求（见 completeNote）。
-  const targetW = Math.min(132, rawW)
+  // 显式宽度优先：给了就直接用它（仍然夹在 24~132 之间），不再看 AI 估的米数。
+  const targetW = forcedW > 0 ? Math.min(132, Math.max(24, forcedW)) : Math.min(132, rawW)
   // 高度只作上限参考（层数 × 6 格 + 屋顶），不再用于缩放
   // 高度上限不能只按"层数 × 层高"算：三层玻璃楼在照片里 1.8 宽高比，
   // 48 格宽就该有 26 格高，而 floors × 4.6 + 4 只给到 18 ——
@@ -766,6 +772,9 @@ export default defineEventHandler(async (event) => {
     return s
   }
   applySize(spec)
+  // 白石头建筑别被写成灰盒子：照片量出来是近白石材、AI 却给了混凝土灰时，改回来
+  const palFixed = fixWallPalette(spec, (brief as any)?.palette, extra)
+  if (palFixed.length) console.log('[plan] 配色兜底：', palFixed.join('；'))
   // 形体兜底：视觉判读到"六边形平面 / 朝外又朝前地斜"，但蓝图里一个字段都没写时，
   // 在这里按几何规则补上。不补的话，AI 写不写是抛硬币 —— 用户看到的
   // "更新完和上一版一样"就是这么来的。
