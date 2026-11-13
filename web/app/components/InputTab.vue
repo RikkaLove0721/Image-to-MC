@@ -11,6 +11,7 @@ const props = defineProps<{
     scale?: number
     detail?: number
     craft?: number
+    complexity?: number
     hint?: string
     width?: number
   } | null
@@ -46,6 +47,23 @@ const craft = ref(1)
 const CRAFT_LABEL = ['低 · 贴近照片', '中 · 还原为主', '高 · 社区法则优先']
 const detailLevel = ref(2)
 const DETAIL_LABEL: Record<number, string> = { 1: '基础', 2: '标准', 3: '精细' }
+
+/**
+ * 结构数量 1~5：建筑由几个部分组成。
+ *
+ * 和"细节等级"不是一回事：细节等级管的是线脚、窗套这类贴面装饰；
+ * 结构数量管的是**体量**——角塔、侧翼、门厅、凸窗、楼梯间、屋面设备。
+ * 照片里的建筑通常有几十个组成部分，而 AI 一次只写得动三五个体块，
+ * 所以这一档不由 AI 写，交给构建器按规则长（见 mc12/spec.py 的 _grow_volumes）。
+ */
+const complexity = ref(2)
+const COMPLEXITY_LABEL: Record<number, string> = {
+  1: '简易 · 只有主体',
+  2: '基本 · 两角塔',
+  3: '标准 · 四角塔 + 凸窗',
+  4: '精细 · 加侧翼门厅',
+  5: '复杂 · 二三十个结构',
+}
 
 /** AI 上次判断出来的建筑实际尺寸（米），自动选尺寸时要用 */
 const buildingMeters = ref<number[] | null>(null)
@@ -269,6 +287,7 @@ function persistSettings() {
         scale: scale.value,
         detail: detailLevel.value,
         craft: craft.value,
+        complexity: complexity.value,
         hint: aiCfg.hint,
       },
     }).catch(() => {
@@ -277,7 +296,7 @@ function persistSettings() {
   }, 500)
 }
 
-watch([scale, detailLevel, craft, () => aiCfg.hint], persistSettings)
+watch([scale, detailLevel, craft, complexity, () => aiCfg.hint], persistSettings)
 
 /* ---- AI 配置与出图 ---- */
 
@@ -306,6 +325,7 @@ onMounted(async () => {
     if (typeof st.scale === 'number') scale.value = Math.min(SCALE_MAX, Math.max(SCALE_MIN, st.scale))
     if (typeof st.detail === 'number') detailLevel.value = Math.min(4, Math.max(1, Math.round(st.detail)))
     if (typeof st.craft === 'number') craft.value = Math.min(2, Math.max(0, Math.round(st.craft)))
+    if (typeof st.complexity === 'number') complexity.value = Math.min(5, Math.max(1, Math.round(st.complexity)))
     if (typeof st.hint === 'string') aiCfg.hint = st.hint
   }
   // 灌完之后放开写入：否则一进项目就把同样的值再写一遍，
@@ -385,6 +405,7 @@ async function makePlan() {
     emit('toast', '先上传一张正视图', 'err')
     return
   }
+  xiaocTell('plan-start')
   aiBusy.value = true
   aiError.value = ''
   aiNote.value = ''
@@ -404,6 +425,7 @@ async function makePlan() {
         scale: scale.value,
         detail: detailLevel.value,
         craft: craft.value,
+        complexity: complexity.value,
         hint: aiCfg.hint,
       },
     })
@@ -423,6 +445,7 @@ async function makePlan() {
     aiUsage.value = res.usage || null
     aiAnalysis.value = res.analysis || null
     aiScore.value = typeof res.score === 'number' ? res.score : null
+    xiaocTell('plan-done', { score: aiScore.value ?? undefined })
     // 照片被裁过：接口会按对称把建筑补全，把"补了多少"带回界面
     const cpt = res.spec?.complete
     aiComplete.value =
@@ -465,6 +488,7 @@ async function makePlan() {
     if (planTimer) clearInterval(planTimer)
     planTimer = null
     aiBusy.value = false
+    if (aiError.value) xiaocTell('plan-fail')
   }
 }
 
@@ -479,6 +503,7 @@ async function buildPlan() {
   log.value = ''
   status.value = 'running'
   elapsed.value = 0
+  xiaocTell('build-start')
   // 用户手改蓝图时可能把 seed 删掉了：补回来，生成出来的模型才可复现
   if (aiSeed.value && spec.seed == null) spec.seed = aiSeed.value
   try {
@@ -496,6 +521,7 @@ async function buildPlan() {
     startTimers()
   } catch (err: any) {
     status.value = 'failed'
+    xiaocTell('build-fail')
     emit('toast', err?.data?.statusMessage || '启动失败', 'err')
   }
 }
@@ -529,9 +555,11 @@ async function poll() {
     }
     stopTimers()
     if (res.status === 'done') {
+      xiaocTell('build-done', { model: res.modelName, elapsed: elapsed.value })
       emit('toast', '生成完成，已跳到输出结果')
       emit('generated', res.modelName)
     } else {
+      xiaocTell('build-fail')
       emit('toast', `生成失败（退出码 ${res.code}），日志里能看到原因`, 'err')
     }
   } catch {
@@ -657,6 +685,32 @@ watch(log, scrollLog)
               <option :value="3">精细（大模型）</option>
               <option :value="4">观赏性细节（社区级）</option>
             </select>
+          </div>
+          <div class="field" style="grid-column: 1 / -1">
+            <label class="field-label" style="display: flex; align-items: center; gap: 8px">
+              结构数量
+              <b style="color: var(--brand-deep)">{{ COMPLEXITY_LABEL[complexity] }}</b>
+            </label>
+            <input
+              v-model.number="complexity"
+              type="range"
+              min="1"
+              max="5"
+              step="1"
+              class="scale-slider"
+            />
+            <div class="scale-ticks">
+              <span>简易</span><span>基本</span><span>标准</span><span>精细</span><span>复杂</span>
+            </div>
+            <div class="fusion-note" style="margin-top: 8px">
+              <UiIcon name="info" :size="14" />
+              <span>
+                建筑由几个部分组成：角塔、侧翼、门厅、凸窗、楼梯间、屋面设备。
+                照片里的楼通常有几十个组成部分，而 AI 一次只写得动三五个体块，
+                所以这一档不让 AI 写 —— 由构建器按主体轮廓往外长。
+                <b>调高会让轮廓更碎、方块更多</b>，简易档则是干净的现代体块。
+              </span>
+            </div>
           </div>
           <div class="field" style="grid-column: 1 / -1">
             <label class="field-label" style="display: flex; align-items: center; gap: 8px">

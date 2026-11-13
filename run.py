@@ -87,6 +87,12 @@ def parse_args(argv=None):
     )
     p.add_argument("--img-out", default=None, help="--compare 的输出路径（JPEG）")
     p.add_argument(
+        "--thumb",
+        nargs=2,
+        metavar=("SRC", "OUT"),
+        help="把照片缩成给视觉模型看的 JPEG（长边 1400）：原图 5MB 直接 base64 会被接口拒",
+    )
+    p.add_argument(
         "--seed",
         type=int,
         default=None,
@@ -297,6 +303,32 @@ def run_compare(photo: str, render: str, out: str) -> int:
     return 0
 
 
+def run_thumb(src: str, out: str, max_side: int = 1400) -> int:
+    """把照片缩成给视觉模型看的小图。
+
+    原图动辄 5MB，base64 之后 7MB，视觉接口会直接拒（readPhoto 静默返回 null，
+    表现出来就是"看着像没开视觉"）。缩到 1400 长边、JPEG q82 是 200KB 级别，
+    肉眼判读建筑够用，token 也省一半。
+    """
+    from PIL import Image
+
+    img = Image.open(src).convert("RGB")
+    k = min(1.0, max_side / float(max(img.size)))
+    if k < 1.0:
+        img = img.resize(
+            (max(1, int(round(img.width * k))), max(1, int(round(img.height * k)))),
+            Image.LANCZOS,
+        )
+    out_path = Path(out)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    img.save(out_path, "JPEG", quality=82, optimize=True)
+    print(json.dumps(
+        {"path": str(out_path), "size": list(img.size), "bytes": out_path.stat().st_size},
+        ensure_ascii=False,
+    ))
+    return 0
+
+
 def main(argv=None) -> int:
     _force_utf8()
     args = parse_args(argv)
@@ -322,6 +354,8 @@ def main(argv=None) -> int:
             print("--critique 需要 --spec 蓝图 和 -i 照片", file=sys.stderr)
             return 2
         return run_critique(args.spec, args.input, args.width or 40, args.critique_iso)
+    if args.thumb:
+        return run_thumb(args.thumb[0], args.thumb[1])
     if args.compare:
         if not args.img_out:
             print("--compare 需要 --img-out 输出路径", file=sys.stderr)

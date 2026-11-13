@@ -47,6 +47,10 @@ RULES_TEXT = """MC 建筑设计常识（必须遵守）
 细节规定（别墅、住宅、公共建筑都要做到）
 11. 必须有入口：门宽 2~4 格、高 3 格，四周有门框，门前铺 1~3 格台阶或压一个雨棚。
     没有门的建筑只能算"立面"，不能算"房子"。
+    要气派的入口（宫殿、宫堡、公共建筑的主门）用 **portico 柱廊**：
+    3 根以上柱子撑起一层檐口、**柱间是空的**，人从柱子中间走进去。
+    只写 door + canopy 会叠成"墙上贴一块板"，远看就是一面白墙 ——
+    用户的原话是"应该是几根柱子围着，而不是一面墙"。
 12. 必须有勒脚：贴地一圈（高 1~2 格）换成深一档材料，把楼和地面分开。
 13. 必须有檐口：墙顶一圈用深色材料收边；平顶再把女儿墙压顶，
     否则顶上是一道生硬的切口。
@@ -124,6 +128,25 @@ RULES_TEXT = """MC 建筑设计常识（必须遵守）
 39. 本软件的方块库以 **MC 1.12.2** 为准（数字 ID + metadata）。
     1.13+ 的方块（深板岩、方解石、凝灰岩、玄武岩、铜块、樱花木等）这里没有，
     写了也会兜底成石头。需要别的版本请自行改 `mc12/palette.py` 扩表。
+40. **山城 / 宫堡 / 高台基建筑必须有"爬上去"的那条路**。照片里那种
+    "前方很多楼梯一圈圈往上绕"，本质是一条贴着墙面的折返坡道 + 栏墙：
+    {"type":"grand_stairs","volume":最高那级台基,"face":"south","u":12,"w":6,
+     "turns":1,"run":2,"y0":0,"y1":20,"mat":"wall","rail":"wall","rail_h":0}
+    - `y1` 是**绝对高度**（相对该体块底面），可以超过体块自己的 h；
+    - `w` 梯宽 3~6，`run` 是每级踏步的进深 —— 写 1 是 45° 斜坡（等轴测里读成一面斜墙），
+      写 2 才像台阶；
+    - `turns` 折返次数，绕得越高给越多；`rail_h` 是栏墙高出踏步的格数（0~1）。
+    缺了它，"爬在山上的宫殿"就变成几摞摆在地上的白盒子 —— 布达拉宫那道
+    圆满汇集道比金顶还醒目，却是最常被漏掉的一笔。
+41. **弧形柱廊用 `bow_portico`，不要用直柱廊顶替**。白宫南门廊、圆厅别墅、
+    很多新古典府邸的正门都是半圆：柱子沿一段圆弧排开，檐部和顶部栏杆跟着弯。
+    {"type":"bow_portico","volume":0,"face":"south","u":33,"r":12,"count":6,
+     "h":26,"col_w":2,"spread":74,"mat":"wall","rail":"wall"}
+    - `u` 是弧心在立面上的位置，`r` 是弧顶离墙几格，`count` 柱子数（5~8 最像）；
+    - `col_w` 柱宽（大模型取 2，否则柱子细成一根线）；
+    - **柱距要够**：`2r/count` 小于 3 格时柱子会连成一排栅栏，读不出"柱廊"。
+    直柱廊 + 一堵墙/顶板，在等轴测里就是"墙上贴了块板"，用户的原话是
+    "应该是几根柱子围着，而不是一面墙"。
 """
 
 # MC 社区建筑技巧。`craft` 档位越高，越优先用这里的东西，
@@ -243,6 +266,101 @@ C9. **不要**把住宅语汇搬过来：坡屋顶、阳台、孟莎顶、老虎
 """
 
 
+MODERN_TEXT = """现代建筑常识（科研楼 / 办公楼 / 美术馆 / 综合体 / 玻璃盒子；这是第三套语汇）
+
+M1. 现代建筑的体量是**错位堆叠的盒子**，不是"主体 + 两翼"。每个盒子写成一个
+    volume，靠 x/y/z 三个数字错开：上层在平面上偏 2~6 格，或比下层**探出** 2~4 格。
+M2. **至少一处悬挑**：上层体块的 w/d 比下层大 2~4 格，或者上层的 z 比下层小 2~4 格
+    （向南探出）。探出去那几格的底面就是雨棚，所以悬挑下方必须是空的 ——
+    在下面塞一个撑到地面的体块，悬挑立刻读成"墙厚了一截"。
+    **上层不要层层缩小**：相邻两层的 w/d 相差控制在 4 格以内，靠 x/z 错位错开即可。
+    每层都比下层小一圈，出来的是梯田/生日蛋糕，下半层的屋面露出来一大片。
+M3. **底层内收**：首层玻璃退进 2~3 格，上面压一个更大的体块，整栋才有"浮起来"的感觉。
+    首层通高 6~9 格，不要和内收的深度一起缩。
+M4. 立面主体是**通高玻璃幕墙**：curtain_wall 跨整层（h 4~9），mullion 3~5、transom 3~4，
+    frame_mat 用深灰（concrete:7 / concrete:15）或白（quartz_block:0）。
+    玻璃要占正立面 40% 以上，低了这个体量立刻变回砌体楼。
+M5. **竖向遮阳百叶**是这类建筑最强的识别特征：louver 铺满一段立面，
+    step 1~2、out 1、h 5~9、mat 用白色混凝土或浅灰。百叶后面仍然是玻璃，
+    所以先写 curtain_wall，再写 louver 盖在同一条 u 上。
+M6. 屋顶只能是 flat + parapet 1~2，**屋面材料取墙色系（白/浅灰）**，
+    深灰屋面在等轴测里像盖了一块铁皮，也把"白色建筑"的整体读感破坏掉。**不要** mansard / hip / gable / dormer /
+    chimney / arcade / portico / pediment / column —— 这些一出现就变回古典府邸。
+M7. 现代建筑没有"一扇扇的小方窗"。要么整片幕墙，要么横向带窗
+    （curtain_wall 写 h 2~3、w 铺满立面，做成一条横贯的玻璃带）。
+    windows 最多留 1 条补侧立面，正面交给 curtain_wall。
+M8. **错位是设计，不是失误**：2~4 个体块不要在 x 上首尾对齐，也不要一样高。
+    至少一处退台（上层缩进 2~4 格）或一处出挑（上层探出 2~4 格）。
+M9. 层高 4~5 格，首层可以 6~9 格。开间节奏 3~5 格一根竖梃。
+M10. 配色素到极致：白 / 浅灰墙 + 冷色玻璃 + 一处点缀（木色、橙色、锈红）。
+    深色只用在框、勒脚、屋面设备上。
+M11. 女儿墙与屋面设备（设备箱、风机、楼梯间）是平屋顶的"人味"：
+    detail ≥ 3 时用一个 1~2 格高的小体块压在屋面上，别铺满。
+M12. 入口是整面玻璃的一部分：door 用 stained_glass:15，w 4~6、h 4~5，
+    不要写台阶堆到 3 格以上。
+M13. 室内灯带、天花灯槽用 **sea_lantern**（冷白）。glowstone 是暖黄的，
+    在现代白色立面里会读成一条黄色胶带。
+M14. **斜置体块**：照片里上层盒子与下层不平行时，别硬写成正交长方体。
+    给 volume 加 `"lean": {"x": 5}`（整个体块往上斜 5 格，剖面是平行四边形）
+    或 `"skew": {"z": 6}`（沿进深方向横移 6 格，平面是平行四边形）。
+    这两个参数是"不规则形体"的关键：只靠 x/y/z 错位，永远是一摞方块。
+    lean 取 3~8、skew 取 4~10；一个体块只用一种，别两个一起拉到极限。
+M15. 斜置只给**上层的一到两个盒子**，底层保持水平 —— 整栋都斜会塌。
+    斜的那一层要留出**净立面**（玻璃或百叶），否则斜面被细节糊住，
+    远看只是一堵厚墙。斜置体块的女儿墙、檐口、百叶会自动跟着斜，不用另写。
+M16. **斜可以是两个方向，而且经常是两个方向**：真实照片里上层盒子既朝外挑、
+    又朝街（前方）挑，写 `"lean": {"x": 5, "z": 4}` —— x 是左右、z 是进深，
+    两个都给 = 斜着一个角挑出去。只往外挑写 x，只往前挑写 z；
+    判断方法是看上层盒子的**两条边**：正面看偏不偏（x）、侧面看探不探（z）。
+    格数取体块高度的 1/3 左右（h 12 → 4~6 格），再多会读成"楼要倒了"。
+M17. **但最常见的是"整层斜带"，那个必须用 tilt**：lean 只让墙斜，
+    每一层的楼板仍然是水平的 —— 照片里"中间那一层像一条左低右高的带子"、
+    一层与一层的接缝是斜的，用 lean 怎么做都是平的三明治。
+    `"tilt": {"axis": "x", "bottom": 8, "top": 8}` = 整层斜带，右端比左端高 8 格；
+    只写 `bottom` = 斜底悬挑（盒子方正、底面被斜切，`top` 不写）；
+    只写 `top` = 斜屋面。简写 `"tilt": {"x": 7}` 等于 bottom 与 top 同值。
+    坡度取体块长度的 1/5~1/4（40 格宽 → 8~10 格），**小于 4 格等于没斜**。
+    斜带的楼板、女儿墙、檐口、百叶会**按列**自动跟着斜，幕墙照常写 w/h，不用算斜边。
+M19. **哥特/古典立面的四件套**（细节等级高时用，比一堆小体块省事得多）：
+    `lancet` 尖拱窗（`{"type":"lancet","face":"south","volume":1,"u":2,"v":6,"w":2,"h":12,"cols":4,"gap_u":3}`，
+    一次排一串，顶部自动收尖）、`rose` 玫瑰窗（`{"type":"rose","u":14,"v":16,"d":7}` 圆窗 + 石十字）、
+    `buttress` 扶壁（`{"type":"buttress","u":0,"count":5,"spacing":8,"h":16}` 外凸竖墩）、
+    `pinnacle` 小尖饰（`{"type":"pinnacle","u":2,"count":5,"spacing":7,"h":3}` 墙顶成排小尖）。
+    哥特立面的节奏是"窗—墩—窗—墩"，只排窗不排墩，墙是一片平板。
+M20. **比例尺决定细节上限**：8 格/米时一层楼 20 多格，窗可以做到 4~6 格宽、
+    能画出窗棂和尖拱；2 格/米时一扇窗只有 2 格，再多的构件也糊在一起。
+    写蓝图时如果比例尺大，窗的 w/h、窗阵列数、构件数量都要跟着放大。
+M18. **斜带上的盒子要"贴着带子走"**：想在上层再摞盒子时，
+    盒子的 `tilt.bottom` 与斜带**同值**、`y` 取斜带**顶面在低端的高度**，
+    这样盒子底面与带子顶面平行贴合，不会一头悬空一头埋进墙里。
+M17. **平面轮廓不一定是矩形**：六边形的实验楼、八边形的塔楼、楔形展厅、
+    L 形转角楼，用 volume 的 `"shape"` 写，不要拿 w/d 硬凑：
+    · `"hex"`：前后两条长边 + 左右两端收成 45° 尖；
+    · `"hex_front"`：前窄后宽（正面两角 45° 切掉），最常见的"六边形楼层"；
+    · `"oct"` 八边形 · `"wedge"` 正面收成窄边 · `"round"` 圆塔 · `"l"` L 形；
+    · `"poly"` 自己给顶点：`"poly": [[0,0],[20,0],[20,8],[14,16],[0,16]]`（局部坐标 0..w）。
+    轮廓会自动变成斜墙，窗、幕墙、檐口、女儿墙、勒脚、楼板全都跟着走，
+    不用另写。只给 w/d 两个数，无论怎么调都还是一个长方形。
+"""
+
+# 现代建筑的判定词。只认**建筑类型**里的词，不靠"玻璃多"这种量测兜底：
+# 教堂也可以用大玻璃，但它的语汇是拱券和尖塔，不是悬挑和百叶。
+MODERN_WORDS = (
+    "现代", "当代", "实验", "科研", "办公", "写字楼", "总部", "美术馆",
+    "展览", "展馆", "展示中心", "科技", "综合体", "厂房", "艺术中心",
+    "体育馆", "机场", "车站", "玻璃盒",
+)
+
+
+def is_modern_type(btype: str) -> bool:
+    """这份建筑类型是不是"现代建筑"（第三套语汇）。"""
+    s = str(btype or "")
+    if any(k in s for k in SHOP_WORDS):
+        # 店面优先走商业立面那一套，两条都套会互相打架
+        return False
+    return any(k in s for k in MODERN_WORDS)
+
+
 def rules_text(subject: str = "", ornament: bool = False, craft: int = 1) -> str:
     """按主体类型给规则。舰船不套建筑那 34 条，否则 AI 一定做回一栋楼。
 
@@ -258,6 +376,10 @@ def rules_text(subject: str = "", ornament: bool = False, craft: int = 1) -> str
     base = SHIP_RULES_TEXT if ship else RULES_TEXT
     if not ship and any(k in s for k in ("shop", "commercial", "store", "retail")):
         base = f"{base}\n\n{COMMERCIAL_TEXT}"
+    # 现代建筑：通用规则讲的是"开间、勒脚、檐口、坡屋顶"，照它做一栋玻璃实验室
+    # 会得到一座孟莎屋顶的府邸（实测过）。所以再追加一段"错位堆叠 + 悬挑 + 幕墙 + 百叶"。
+    if not ship and any(k in s for k in ("modern", "contemporary")):
+        base = f"{base}\n\n{MODERN_TEXT}"
     if ornament:
         base = f"{base}\n\n{ORNAMENT_TEXT}"
     if int(craft) >= 2:
@@ -386,6 +508,88 @@ def _check_ornament(raw: dict) -> list[str]:
 SHOP_WORDS = ("店", "商业", "餐厅", "商铺", "展厅", "快餐", "超市", "银行", "门店", "营业厅")
 
 
+def _check_modern(raw: dict, kinds: set[str], roof: dict, vols: list) -> list[str]:
+    """现代建筑的专项检查：只看"错位、悬挑、幕墙、有没有变回府邸"。
+
+    这张照片跑出来的第一版是"白石府邸"：孟莎屋顶 + 老虎窗 + 门廊 + 山花。
+    原因不是材质，是**语汇**：通用规则里没有现代建筑这一支，AI 只能往古典里套。
+    所以这里的每一条都对着"变回古典"或"三个盒子对齐码齐"这两种失败。
+    """
+    out: list[str] = []
+    kind = str(roof.get("type", "flat"))
+    if kind != "flat":
+        out.append(
+            f"现代建筑给了 {kind} 屋顶：会立刻变回府邸/住宅；改成 flat + parapet 1~2"
+        )
+    bad = {"arcade", "portico", "pediment", "dormer", "column", "signbox"} & kinds
+    if bad:
+        out.append(
+            f"混进了古典或商业构件（{'、'.join(sorted(bad))}）：现代建筑靠幕墙 + 百叶 + 女儿墙收头"
+        )
+    if "curtain_wall" not in kinds:
+        out.append(
+            "没有玻璃幕墙（curtain_wall）：这类建筑正面就是整片玻璃，"
+            "缺了它只剩一面白墙；h 取 4~9、mullion 3~5"
+        )
+    if not ({"louver"} & kinds) and len(vols) >= 2:
+        out.append(
+            "没有竖向百叶（louver）：竖向遮阳板是这类立面最强的识别特征，"
+            "挑一段 u 写 louver（step 1~2、out 1、mat 白混凝土）"
+        )
+    if len(vols) >= 2:
+        # 错位：两个体块在平面上完全一样大、又贴着同一条边，就是"码齐的盒子"。
+        aligned = 0
+        pairs = 0
+        for i in range(len(vols)):
+            for j in range(i + 1, len(vols)):
+                a, b = vols[i], vols[j]
+                ax, aw = int(a.get("x", 0)), int(a.get("w", 0))
+                bx, bw = int(b.get("x", 0)), int(b.get("w", 0))
+                az, ad = int(a.get("z", 0)), int(a.get("d", 0))
+                bz, bd = int(b.get("z", 0)), int(b.get("d", 0))
+                pairs += 1
+                if ax == bx and aw == bw and az == bz and ad == bd:
+                    aligned += 1
+                elif (ax == bx and aw == bw) or (az == bz and ad == bd):
+                    # 只有一个方向对齐是正常的退台；两个方向都对齐才是"码齐"
+                    pass
+        if pairs and aligned == pairs:
+            out.append(
+                "所有体块在平面上完全重合：这就是一根更高的方柱；"
+                "上层要偏移 2~6 格或探出 2~4 格，错位才是这类建筑的形体来源"
+            )
+        heights = {int(v.get("h", 0)) for v in vols}
+        if len(heights) == 1:
+            out.append(
+                f"{len(vols)} 个体块一样高：没有主次；让主盒高 4~8 格，或者干脆做成两个高低错开的盒子"
+            )
+        # 并排的"主楼 + 两翼"是这类照片最常见的错法：它是错位**上下叠**，
+        # 不是三栋并排的房子。
+        overlap = False
+        for i in range(len(vols)):
+            for j in range(i + 1, len(vols)):
+                a, b = vols[i], vols[j]
+                ox = min(int(a.get("x", 0)) + int(a.get("w", 0)),
+                         int(b.get("x", 0)) + int(b.get("w", 0))
+                         ) - max(int(a.get("x", 0)), int(b.get("x", 0)))
+                oz = min(int(a.get("z", 0)) + int(a.get("d", 0)),
+                         int(b.get("z", 0)) + int(b.get("d", 0))
+                         ) - max(int(a.get("z", 0)), int(b.get("z", 0)))
+                if ox > 0 and oz > 0:
+                    overlap = True
+        if not overlap:
+            out.append(
+                "几个体块在平面上互不重叠：这是并排的三栋房子；"
+                "现代建筑是**上下叠**的盒子（y 一层层接、平面互相重叠）"
+            )
+        if not any(int(v.get("y", 0)) > 0 for v in vols):
+            out.append(
+                "所有体块都从地面起（y 全是 0）：没有悬挑也没有内收；"
+                "把上层体块的 y 抬到下层顶面，并让它在平面上探出 2~4 格"
+            )
+    return out
+
+
 def _check_commercial(raw: dict, kinds: set[str], roof: dict) -> list[str]:
     """商业立面的专项检查。
 
@@ -396,8 +600,23 @@ def _check_commercial(raw: dict, kinds: set[str], roof: dict) -> list[str]:
     btype = str((raw.get("building") or {}).get("type") or "")
     shop = any(k in btype for k in SHOP_WORDS)
     if not shop:
-        # 反过来也要管：住宅/学校写上了商业构件，会变成"贴了张招牌的居民楼"
+        # 反过来也要管：住宅/学校写上了商业构件，会变成"贴了张招牌的居民楼"。
+        # 现代建筑例外：通长水平带、竖百叶、花池本来就是他自己的分格手段，
+        # 只有招牌仍然是商业专属。
         borrowed = {"band", "louver", "planter", "signbox"} & kinds
+        if is_modern_type(btype):
+            borrowed = {"signbox"} & kinds
+        # band 有两种用法：out≥1 是商业的招牌/灯带外挑板；out=0 只是"这一圈
+        # 换一种料"（藏式的边玛墙、石砌腰线都这么做），跟商业没有关系。
+        # 只按 out=0 用过的，不该被扣上"贴了张招牌的居民楼"。
+        if "band" in borrowed:
+            flat_only = all(
+                int((d or {}).get("out", 1) or 0) == 0
+                for d in (raw.get("details") or [])
+                if str((d or {}).get("type")) == "band"
+            )
+            if flat_only:
+                borrowed = borrowed - {"band"}
         if borrowed:
             return [
                 f"这是「{btype or '非商业建筑'}」，却用了商业立面构件"
@@ -511,7 +730,7 @@ def check_spec(raw: dict) -> dict:
         fl = int(v.get("floors", 0))
         if fl:
             step = h / fl
-            _top = 8 if _shop else FLOOR_MAX
+            _top = 8 if (_shop or is_modern_type(_btype)) else FLOOR_MAX
             if step < FLOOR_MIN:
                 errors.append(f"体块 {i}: 层高 {step:.1f} 格太矮（应 ≥{FLOOR_MIN}）")
             elif step > _top:
@@ -577,7 +796,7 @@ def check_spec(raw: dict) -> dict:
         )
     fl_max = max([int(v.get("floors") or 0) for v in vols] or [0])
     # 店面的首层是通高的（通高玻璃 + 挑空），按住宅的 5 格去算会误报"楼层被压掉"。
-    per_floor = 8 if _shop else FLOOR_MAX
+    per_floor = 8 if (_shop or is_modern_type(_btype)) else FLOOR_MAX
     if fl_max and prog > fl_max * per_floor:
         warnings.append(
             f"立面写到 {prog} 格，但只声明了 {fl_max} 层（层高上限 {per_floor} 格"
@@ -612,10 +831,14 @@ def check_spec(raw: dict) -> dict:
         "plinth", "cornice", "door", "steps", "balcony", "canopy", "chimney",
         "curtain_wall", "column", "portico", "arcade", "pediment", "dormer",
         "railing", "flagpole", "band", "louver", "planter", "signbox", "lamp",
+        "spire", "pinnacle", "lancet", "rose", "buttress", "dome",
+        "grand_stairs", "staircase", "bow_portico", "portico_bow",
     }
     if unknown:
         warnings.append(f"不认识的细节类型会被忽略：{'、'.join(sorted(unknown))}")
 
     warnings.extend(_check_commercial(raw, kinds, roof))
+    if is_modern_type(_btype):
+        warnings.extend(_check_modern(raw, kinds, roof, vols))
     warnings.extend(_check_ornament(raw))
     return {"ok": not errors, "errors": errors, "warnings": warnings}

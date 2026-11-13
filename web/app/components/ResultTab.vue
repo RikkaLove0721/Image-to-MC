@@ -35,9 +35,16 @@ watch(views, (list) => {
   if (!list.some((v) => v.key === viewKey.value)) viewKey.value = list[0]?.key || 'iso'
 })
 
+watch(viewKey, (k, prev) => {
+  // 只在用户主动切换时说，首次挂载和自动纠正不算
+  if (prev && k !== prev) xiaocTell('view-change', { view: k })
+})
+
 function select(name: string) {
+  const changed = name !== selectedName.value
   selectedName.value = name
   viewKey.value = 'iso'
+  if (changed) xiaocTell('model-select', { model: name })
 }
 
 defineExpose({ select })
@@ -69,7 +76,8 @@ async function openViewer() {
   if (!url) return
   const name = current.value?.name || ''
   const ok = await desktopOpenViewer(url, name ? `3D 查看器 · ${name}` : '3D 查看器')
-  if (!ok) emit('toast', '打不开 3D 查看器', 'err')
+  if (ok) xiaocTell('viewer-open', { model: name })
+  else emit('toast', '打不开 3D 查看器', 'err')
 }
 </script>
 

@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import numpy as np
 
+from .knowledge import is_modern_type
 from .spec import Spec
 
 
@@ -218,7 +219,9 @@ def _critique_ship(brief: dict, spec: Spec, vox: np.ndarray, blocks) -> dict:
         )
 
     # ---- 7. 窗：军舰立面几乎不开窗 ----
-    glass_idx = {i for i, b in enumerate(blocks) if b.id in (20, 95)}
+    # 玻璃板（102）也算玻璃：0.31 之后窗和幕墙默认都转成板，
+    # 只认 20/95 的话舰体上的玻璃条一格都量不到。
+    glass_idx = {i for i, b in enumerate(blocks) if "glass" in b.name_en}
     gmask = np.isin(vox, list(glass_idx)) if glass_idx else np.zeros_like(vox, dtype=bool)
     win_cells = int(gmask.sum())
     solid = int((vox >= 0).sum())
@@ -468,6 +471,9 @@ def critique(brief: dict, spec: Spec, vox: np.ndarray, blocks) -> dict:
     is_shop = any(
         k in btype for k in ("店", "商业", "餐厅", "商铺", "展厅", "快餐", "超市", "银行", "营业厅")
     )
+    # 现代建筑是第三套语汇（悬挑、错位、幕墙、百叶）。不认这一支，
+    # 体检会拿"要有屋顶、要有拱廊"的住宅标准去逼它，越改越像府邸 —— 实测过。
+    is_modern = (not is_shop) and is_modern_type(btype)
     layers = _facade_layers(vox, blocks)
     if is_shop:
         if len(layers) < 3:
@@ -533,6 +539,204 @@ def critique(brief: dict, spec: Spec, vox: np.ndarray, blocks) -> dict:
                 8,
             )
 
+    # ---- 1.7 现代建筑：错位 / 悬挑 / 幕墙 / 百叶 ----
+    # 这一支的病变和住宅正好相反：住宅怕"太平"，现代怕"太整齐"。
+    # 三个盒子对齐码齐、屋顶压一个孟莎，就是"白石府邸"那一次的翻版。
+    if is_modern:
+        if str((spec.roof or {}).get("type", "flat")) != "flat":
+            add(
+                "modern.roof",
+                "high",
+                f"屋顶是 {spec.roof.get('type')}：现代建筑的屋面是平的，坡顶一出现就变回府邸",
+                '改回 {"type":"flat","parapet":1~2}，屋面设备用 1~2 格小体块压',
+                14,
+                {"op": "set", "path": "roof", "to": {"type": "flat", "parapet": 1}},
+            )
+        classical = {"arcade", "portico", "pediment", "dormer", "column"} & kinds
+        if classical:
+            add(
+                "modern.classical",
+                "high",
+                f"混进了古典构件（{'、'.join(sorted(classical))}）：这套语汇一进来，"
+                f"整栋就按府邸读了",
+                "删掉它们，改用 curtain_wall（通高玻璃）+ louver（竖百叶）+ cornice（薄檐口）",
+                10,
+            )
+        share_g = _glass_share(vox, blocks)
+        if share_g < 0.30:
+            add(
+                "modern.glass",
+                "high",
+                f"玻璃只占立面高度的 {share_g:.0%}：这类建筑的正面主体就是玻璃，"
+                f"低于 40% 会读成砌体楼",
+                "curtain_wall 铺满面宽（w = 体块宽 − 2）、跨整层（h 4~9），"
+                "mullion 3~5、transom 3~4；窗列只留给侧立面",
+                12,
+            )
+        if "curtain_wall" not in kinds and "louver" not in kinds:
+            add(
+                "modern.skin",
+                "mid",
+                "既没有幕墙也没有竖百叶：立面只剩一块板，现代感全靠这两样",
+                "先写一条 curtain_wall（h 取层高的 2~3 倍），再在同一条 u 上盖 louver（step 2、out 1）",
+                9,
+            )
+        # 附属体量（角塔/凸窗/侧翼）是"结构数量"长出来的，
+        # 不该按主体的错位/梯田规则去罚
+        vols = [v for v in spec.volumes if not getattr(v, "aux", False)]
+        if len(vols) >= 2:
+            # 平面完全重合 = 一根更高的方柱，不是"错位堆叠"
+            same_xy = all(
+                v.x == vols[0].x and v.z == vols[0].z and v.w == vols[0].w and v.d == vols[0].d
+                for v in vols[1:]
+            )
+            if same_xy:
+                add(
+                    "modern.offset",
+                    "high",
+                    f"{len(vols)} 个体块在平面上完全重合：这就是一根更高的方柱，没有错位",
+                    "上层在 x 或 z 上偏移 2~6 格（w/d 跟着收或放），"
+                    "至少一处探出下层 2~4 格做成悬挑",
+                    12,
+                )
+            # 并排 vs 上下叠：现代建筑的错位是"叠"，不是"排"
+            side_by_side = True
+            for i in range(len(vols)):
+                for j in range(i + 1, len(vols)):
+                    a, b = vols[i], vols[j]
+                    ox = min(a.x1, b.x1) - max(a.x, b.x)
+                    oz = min(a.z1, b.z1) - max(a.z, b.z)
+                    if ox > 0 and oz > 0:
+                        side_by_side = False
+            if side_by_side:
+                add(
+                    "modern.stacked",
+                    "high",
+                    f"{len(vols)} 个体块在平面上互不重叠：并排的三栋房子，不是错位堆叠",
+                    "把体块改成上下叠：下层顶面 = 上层 y，平面互相重叠一半以上，"
+                    "靠 x/z 偏 2~6 格做出错位",
+                    12,
+                )
+            # 层层缩小 = 梯田/生日蛋糕：真正的现代建筑是"错位"，不是"收分"
+            shrink = 0
+            for a in vols:
+                below = [b for b in vols if b is not a and b.y1 <= a.y]
+                if not below:
+                    continue
+                base = max(below, key=lambda b: b.w * b.d)
+                # 屋面上的设备间、楼梯间只有几格，天然"比下层小很多"，
+                # 把它们算进梯田，任何带屋顶小件的蓝图都会被误罚。
+                if a.w * a.d < 0.25 * base.w * base.d:
+                    continue
+                if base.w - a.w > 4 or base.d - a.d > 4:
+                    shrink += 1
+            # 照片里常见"两个小盒子坐在一个大基座上"，那不是梯田 ——
+            # 梯田是**一层层**往回收，至少要连着收三次才读得出。
+            if shrink >= 3:
+                add(
+                    "modern.terrace",
+                    "mid",
+                    f"有 {shrink} 个体块比下层窄了 4 格以上：挤成了梯田（生日蛋糕），"
+                    f"下半层的屋面会露出一大片",
+                    "让相邻两层的 w/d 相差不超过 4 格，靠 x/z 错位错开；"
+                    "屋面露出来的那部分应该是「悬挑下方」，不是「上一层退回去」",
+                    9,
+                )
+            # 悬挑：某个体块相对它下面的体块探出去了
+            cant = False
+            for a in vols:
+                for b in vols:
+                    if a is b or b.y1 > a.y:
+                        continue  # b 必须在 a 之下
+                    if a.x < b.x or a.x1 > b.x1 or a.z < b.z or a.z1 > b.z1:
+                        cant = True
+            if not cant and not same_xy:
+                add(
+                    "modern.cantilever",
+                    "mid",
+                    "没有任何体块探出下层：整栋是竖直堆叠，缺「浮起来」的那一层",
+                    "把上层体块的 w/d 放大 2~4 格，或者 z 往前挪 2~4 格（向南探出），"
+                    "探出部分的下方要留空",
+                    8,
+                )
+            # 错位要"看得出来"。两张 25×20 的盒子只错 1 格，等轴测里就是
+            # 一整块 —— 用户看到的仍是"方盒子"。这里量的是**上层同高体块之间**
+            # 的平面位移，2 格以下等于没错。
+            for i in range(len(vols)):
+                for j in range(i + 1, len(vols)):
+                    a1, b1 = vols[i], vols[j]
+                    if a1.y != b1.y:
+                        continue
+                    ox = min(a1.x1, b1.x1) - max(a1.x, b1.x)
+                    oz = min(a1.z1, b1.z1) - max(a1.z, b1.z)
+                    if ox <= 0 or oz <= 0:
+                        continue  # 不重叠的是"并排"，上面已经罚过
+                    dx = abs(a1.x - b1.x)
+                    dz = abs(a1.z - b1.z)
+                    # 两张盒子可以在 x 上隔很远（左右并排），但只要 z 一样，
+                    # 等轴测里它们就在同一条"带"上，读成一整片而不是两段。
+                    # 真正拉开层次靠的是**进深错位**，这一条不能省。
+                    if dz < 3 and dx < 3:
+                        why = f"x 差 {dx} 格、z 差 {dz} 格"
+                    elif dz < 3:
+                        why = f"进深只差 {dz} 格（x 隔了 {dx} 格）"
+                    else:
+                        why = ""
+                    if why:
+                        add(
+                            "modern.stagger",
+                            "mid",
+                            f"第 {i + 1}、{j + 1} 两个盒子几乎没有进深错位（{why}）："
+                            f"等轴测里会连成一整块，错位等于没做",
+                            f"把其中一个在 z 上拉开 4~6 格（或 x 上 5~8 格），"
+                            f"并让它比另一个高 2~4 格 —— 高低差 + 平面位移才是「错位堆叠」",
+                            10,
+                            {"op": "stagger", "a": i, "b": j, "dz": 5, "dy": 3},
+                        )
+                        break
+                else:
+                    continue
+                break
+            # 斜置 / 多边形平面：不强制，但现代建筑最要紧的"不规则"手段就这几个参数。
+            # cost 0 = 只提示不扣分，别把正交的楼逼成歪的。
+            has_poly = any(getattr(v, "shape", "") or getattr(v, "poly", []) or getattr(v, "chamfer", 0)
+                           for v in vols)
+            if not any(
+                getattr(v, "lean_x", 0) or getattr(v, "lean_z", 0)
+                or getattr(v, "skew_x", 0) or getattr(v, "skew_z", 0)
+                or getattr(v, "tilted", False)
+                for v in vols
+            ):
+                add(
+                    "modern.slant",
+                    "low",
+                    "所有体块都是正交盒子：照片里上层若与底层不平行，现在只能做成方块",
+                    "给上层某个体块加 \"lean\": {\"x\": 4~8}（墙往外斜）、"
+                    "\"skew\": {\"z\": 4~10}（平面斜切），"
+                    "或者 \"tilt\": {\"axis\": \"x\", \"bottom\": 8, \"top\": 8}（整层斜带，"
+                    "楼板斜着走 —— 照片里\"二层像一条斜带\"就是用这个）",
+                    0,
+                )
+            if not has_poly:
+                add(
+                    "modern.plan",
+                    "low",
+                    "所有体块的平面都是矩形：六边形楼层、楔形展厅、L 形转角楼做不出来",
+                    "需要时给 volume 写 \"shape\": \"hex\"（六边形）/ \"hex_front\"（前窄后宽）"
+                    "/ \"oct\"（八边形）/ \"wedge\"（楔形）/ \"round\"（圆塔）/ \"l\"（L 形），"
+                    "或者用 \"poly\": [[x,z],…] 自己给顶点；轮廓边缘会自动变成斜墙",
+                    0,
+                )
+            if not any(v.y > 0 for v in vols):
+                add(
+                    "modern.base",
+                    "mid",
+                    "所有体块都从地面起（y 全是 0）：没有架空层，也没有底层内收",
+                    "把首层玻璃退进 2~3 格，上层体块的 y 抬到首层顶面，"
+                    "整栋才有「底虚上实」的关系",
+                    6,
+                )
+
     # ---- 2. 体量：有没有主次 ----
     # 大型公共建筑先看"够不够大"：33 格宽的宫殿无论细节多好都读不出来，
     # 开间排不下、拱廊只有三四个、老虎窗两三个就没了。
@@ -553,7 +757,10 @@ def critique(brief: dict, spec: Spec, vox: np.ndarray, blocks) -> dict:
             "massing",
             "high",
             f"{W} 格宽只有一个长方体：这是「大房子」，不是「建筑群」",
-            "拆成中央主体 + 两侧翼（主体占 45%~60% 宽，翼低 2~4 格并后退）",
+            "现代建筑拆成**上下错位的几个盒子**（y 一层层叠、平面各偏 2~6 格）；"
+            "其他类型拆成中央主体 + 两侧翼（主体 45%~60% 宽，翼低 2~4 格并后退）"
+            if is_modern
+            else "拆成中央主体 + 两侧翼（主体占 45%~60% 宽，翼低 2~4 格并后退）",
             14,
             {"op": "split_volumes", "main": round(W * 0.5)},
         )
@@ -583,7 +790,7 @@ def critique(brief: dict, spec: Spec, vox: np.ndarray, blocks) -> dict:
     # ---- 3. 屋顶：平顶是"办公楼"的最大来源 ----
     roof_kind = str((spec.roof or {}).get("type", "flat"))
     roof_h = int((spec.roof or {}).get("height", 0) or 0)
-    if roof_kind == "flat" and W >= 32 and not is_shop:
+    if roof_kind == "flat" and W >= 32 and not is_shop and not is_modern:
         big = photo_aspect >= 2.6
         add(
             "roof",
@@ -625,7 +832,9 @@ def critique(brief: dict, spec: Spec, vox: np.ndarray, blocks) -> dict:
         if not v.floors:
             continue
         fh = v.h / v.floors
-        tall = 9.0 if is_shop else 6.5
+        # 店面和现代建筑的首层是通高的（通高玻璃 + 挑空），7~9 格是常态；
+        # 拿住宅的 6.5 去卡它，等于逼 AI 把一层大堂拆成两个夹层。
+        tall = 9.0 if (is_shop or is_modern) else 6.5
         if fh > tall:
             add(
                 "floors",
@@ -646,7 +855,9 @@ def critique(brief: dict, spec: Spec, vox: np.ndarray, blocks) -> dict:
             )
 
     # ---- 5. 窗：铺满度 ----
-    glass_idx = {i for i, b in enumerate(blocks) if b.id in (20, 95)}
+    # 玻璃板（102）也算玻璃：0.31 之后窗与幕墙默认都转成板，只认 20/95
+    # 的话"开窗密度"永远量成 0%，AI 会以为立面是实墙，一轮轮往上加窗。
+    glass_idx = {i for i, b in enumerate(blocks) if "glass" in b.name_en}
     if glass_idx:
         gmask = np.isin(vox, list(glass_idx))
     else:
@@ -667,7 +878,7 @@ def critique(brief: dict, spec: Spec, vox: np.ndarray, blocks) -> dict:
                 bays += 1
             prev = x
         want_bays = max(2, round(main.w / 6))
-        if main.w >= 24 and bays < 0.7 * want_bays and not is_shop:
+        if main.w >= 24 and bays < 0.7 * want_bays and not is_shop and not is_modern:
             add(
                 "windows.rhythm",
                 "mid",
@@ -693,7 +904,7 @@ def critique(brief: dict, spec: Spec, vox: np.ndarray, blocks) -> dict:
             "窗列按 (墙宽 − 2×边距 + 间距) ÷ (窗宽 + 间距) 铺满，覆盖 55%~90%",
             10,
         )
-    elif density > 0.55 and not is_shop:
+    elif density > 0.55 and not is_shop and not is_modern:
         add(
             "windows",
             "low",
@@ -704,17 +915,22 @@ def critique(brief: dict, spec: Spec, vox: np.ndarray, blocks) -> dict:
 
     # ---- 6. 必备构件 ----
     kinds = {str(d.get("type")) for d in spec.details}
+    # 现代建筑的收头是"玻璃落地 + 女儿墙"，没有勒脚也没有檐口 ——
+    # 这两条是住宅/古典的语法。逼它加，等于在玻璃盒子底下糊一圈石头。
+    modern_skin = is_modern
     for need, msg, fix, cost in (
         ("door", "没有入口门", "加 door（w 2~4、h 3、steps 2）", 8),
-        ("plinth", "没有勒脚", "加 plinth（h 1~2），把楼和地面分开", 4),
+        *([] if modern_skin else [("plinth", "没有勒脚", "加 plinth（h 1~2），把楼和地面分开", 4)]),
         # 商业立面的收头是"檐口带（band）"，不是古典 cornice
-        *([] if is_shop else [("cornice", "没有檐口", "加 cornice（out 1），墙顶才不会是一道切口", 4)]),
+        *([] if (is_shop or modern_skin) else [
+            ("cornice", "没有檐口", "加 cornice（out 1），墙顶才不会是一道切口", 4)
+        ]),
     ):
         if need not in kinds:
             add(f"detail.{need}", "high", msg, fix, cost)
 
     # 大型建筑缺拱廊 / 柱廊（店面不适用：那是古典语汇）
-    if W >= 36 and not is_shop and not ({"arcade", "portico", "column"} & kinds):
+    if W >= 36 and not is_shop and not is_modern and not ({"arcade", "portico", "column"} & kinds):
         add(
             "detail.classical",
             "mid",
@@ -777,9 +993,10 @@ def critique(brief: dict, spec: Spec, vox: np.ndarray, blocks) -> dict:
         "photo_aspect": photo_aspect,
         "roof": {"type": roof_kind, "height": roof_h, "share": round(roof_h / max(H, 1), 2)},
         "volumes": len(spec.volumes),
+        "modern": is_modern,
         "window_density": round(density, 3),
         "facade_layers": layers,
-        "glass_share": round(_glass_share(vox, blocks), 2) if is_shop else None,
+        "glass_share": round(_glass_share(vox, blocks), 2) if (is_shop or is_modern) else None,
         "issues": issues,
         # 机器可执行的修改建议：AI 可以照抄，也可以自己换一种改法
         "patches": patches,

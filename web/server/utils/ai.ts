@@ -312,19 +312,62 @@ export function imagePart(filePath: string): Record<string, any> {
   }
 }
 
-/** 从模型的回复里抠出 JSON；容忍 ```json 包裹、前后解释、尾逗号。 */
+/**
+ * 把"写到一半被截断"的 JSON 补成合法的。
+ *
+ * 蓝图动辄 4~6 KB，模型一边想一边写，max_tokens 一满就停在半句上 ——
+ * 表现出来就是"AI 返回的蓝图出错"。以前整段丢弃，用户只能重试，
+ * 而重试十次可能九次都在同一处被截断。这里按括号栈补齐：
+ * 已写完的体积块、窗、细节全部保住，只丢掉最后那个不完整的字段。
+ */
+function repairJson(text: string): string | null {
+  const stack: string[] = []
+  let inStr = false
+  let esc = false
+  let last = ''
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i]
+    if (inStr) {
+      if (esc) esc = false
+      else if (ch === '\\') esc = true
+      else if (ch === '"') inStr = false
+      continue
+    }
+    if (ch === '"') inStr = true
+    else if (ch === '{' || ch === '[') stack.push(ch === '{' ? '}' : ']')
+    else if (ch === '}' || ch === ']') stack.pop()
+    if (!/\s/.test(ch)) last = ch
+  }
+  if (!stack.length && !inStr) return null
+  let out = text
+  if (inStr) out += '"'
+  // 悬空的 "key": 或 "," 直接砍掉，不然补完括号还是解析不了
+  if (/[:,]\s*$/.test(out)) out = out.replace(/[,]\s*$/, '')
+  if (/:\s*$/.test(out)) out = out.replace(/:\s*$/, ': null')
+  while (stack.length) out += stack.pop()
+  return out
+}
+
+/** 从模型的回复里抠出 JSON；容忍 ```json 包裹、前后解释、尾逗号、被截断。 */
 export function parseJsonLoose(raw: string): any | null {
   if (!raw) return null
   let text = raw.trim()
   const fence = text.match(/```(?:json)?\s*([\s\S]*?)```/i)
   if (fence) text = fence[1]
   const start = text.indexOf('{')
-  const end = text.lastIndexOf('}')
-  if (start < 0 || end <= start) return null
-  const body = text.slice(start, end + 1).replace(/,\s*([}\]])/g, '$1')
-  try {
-    return JSON.parse(body)
-  } catch {
-    return null
+  if (start < 0) return null
+  const body = text.slice(start)
+  // 先试"最后一个 } 截断"（正常情况），再试补括号（max_tokens 用尽）
+  for (const cand of [body, repairJson(body)]) {
+    if (!cand) continue
+    const end = cand.lastIndexOf('}')
+    if (end <= 0) continue
+    const slice = cand.slice(0, end + 1).replace(/,\s*([}\]])/g, '$1')
+    try {
+      return JSON.parse(slice)
+    } catch {
+      /* 下一个候选 */
+    }
   }
+  return null
 }

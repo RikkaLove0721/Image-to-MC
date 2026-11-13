@@ -9,20 +9,22 @@ venv/
 node_modules/
 .nuxt/
 .output/
+# 构建时为了绕开批量删除保护，会把旧产物挪成 .output_bak_1855 这种名字
+.output_bak_*/
 .nitro/
 .cache/
 *.log
 npm-debug.log*
 
 # ---------- 构建产物 ----------
-output/
-dist/
-build/
+/output/
+/dist/
+/build/
 pack/dist/
 
 # ---------- 运行时数据（项目库、临时文件） ----------
-projects/
-temp/
+/projects/
+/temp/
 *.schematic
 *.schem
 

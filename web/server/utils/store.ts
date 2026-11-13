@@ -310,18 +310,37 @@ export function scanModels(project: Project): ModelSummary[] {
   return out
 }
 
-/** 删除一个模型的所有产物（模型名不能带路径）。 */
-export function deleteModel(project: Project, name: string): { removed: string[] } {
-  if (!/^[A-Za-z0-9_-]{1,64}$/.test(name)) {
+/**
+ * 模型名校验。
+ *
+ * 模型名会被直接拼进文件名（`<名字>_iso.png`、`<名字>_r2_manifest.json`），
+ * 所以只挡两类东西：能穿越目录的字符（路径分隔符、".."）和不可见控制字符。
+ * **中文是合法的** —— 项目里本来就有「m10_白宫」这种名字。早先只认
+ * `[A-Za-z0-9_-]`：一旦模型名带中文，"修改这一版"就会在生成前直接报
+ * 「模型名不合法」，看起来像功能坏了。
+ */
+export function checkModelName(raw: string): string {
+  const name = String(raw || '').trim()
+  if (!name || name.length > 64) {
     throw createError({ statusCode: 400, statusMessage: '模型名不合法' })
   }
+  if (/[\\/:*?"<>|\u0000-\u001f]/.test(name) || name === '.' || name === '..' || name.startsWith('.')) {
+    throw createError({ statusCode: 400, statusMessage: '模型名不合法' })
+  }
+  return name
+}
+
+/** 删除一个模型的所有产物（模型名不能带路径）。 */
+export function deleteModel(project: Project, rawName: string): { removed: string[] } {
+  const name = checkModelName(rawName)
   const dir = path.join(projectDir(project.id), 'output')
   if (!fs.existsSync(dir)) {
     throw createError({ statusCode: 404, statusMessage: '这个项目还没有输出' })
   }
   const removed: string[] = []
-  // 修改版（m11_r2）是独立模型，删 m11 时不能连带删掉它
-  const revPrefix = new RegExp(`^${name}_r\\d+`)
+  // 修改版（m11_r2）是独立模型，删 m11 时不能连带删掉它。
+  // 名字里可能有正则元字符（英文句点、括号），必须转义再用。
+  const revPrefix = new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}_r\\d+`)
   for (const entry of fs.readdirSync(dir)) {
     if (revPrefix.test(entry)) continue
     // m01.schematic / m01_iso.png / m01_manifest.json 都归 m01；

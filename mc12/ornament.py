@@ -610,6 +610,11 @@ def _building_props(builder, spec: "Spec", rng: random.Random, tops: np.ndarray,
     def outward(x: int, y: int, z: int) -> tuple[int, int] | None:
         for v in spec.volumes:
             if v.x <= x <= v.x1 and v.z <= z <= v.z1 and v.y <= y <= v.y1:
+                # 非矩形平面：六边形的斜边不在 bbox 边上，按"邻居在不在轮廓里"判
+                if getattr(v, "plan", None) and v.plan() is not None:
+                    for dx, dz in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                        if v.contains(x, z) and not v.contains(x + dx, z + dz):
+                            return dx, dz
                 if x == v.x:
                     return -1, 0
                 if x == v.x1:
