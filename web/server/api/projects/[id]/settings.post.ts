@@ -33,6 +33,8 @@ export default defineEventHandler(async (event) => {
     complexity: Math.round(num(body.complexity, 1, 5, prev.complexity ?? 2)),
     // 模型总宽（格）：0 = 自动
     modelWidth: Math.round(num(body.modelWidth, 0, 132, prev.modelWidth ?? 0)),
+    // 室内设计（隔房间 + 楼梯）
+    interior: body.interior === undefined ? Boolean(prev.interior) : Boolean(body.interior),
     hint: String(body.hint ?? prev.hint ?? '').slice(0, 400),
     // 分析宽度（AI 前端的采样宽度），16~96
     width: Math.round(num(body.width, 16, 96, prev.width ?? 40)),

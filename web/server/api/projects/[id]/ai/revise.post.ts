@@ -144,6 +144,10 @@ export default defineEventHandler(async (event) => {
   // 用户要的是"完全自由的修改"，把比例/层数/尺寸钉死会让"太矮，加两层"
   // 这种要求直接失效。
   if (prev.seed !== undefined) next.seed = prev.seed
+  // 室内设计同样是构建期开关：AI 重写蓝图时很容易把它漏掉，
+  // 而用户根本没提这件事 —— 漏掉就等于"改一次颜色，屋里全空了"。
+  if (prev.interior) next.interior = true
+  else delete next.interior
   // 形体字段（shape / lean / skew）仍然兜一层：用户只让改颜色，
   // 结果斜的那一层变回方块 —— 这是"改完反而退步"的常见原因。
   // 但它只是"补空缺 + 校正方向"，不会把用户明确要求改的形体拉回去。

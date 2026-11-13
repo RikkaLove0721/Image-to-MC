@@ -183,6 +183,11 @@ def run_spec(path: str, out_dir: Path, name: str | None, seed: int | None = None
             if sinfo.get("ornament_patch") or sinfo.get("ornament_prop")
             else ""
         )
+        + (
+            f" / 室内 {sinfo['interior_walls']} 道隔墙、{sinfo['interior_stairs']} 部楼梯"
+            if sinfo.get("interior_walls") or sinfo.get("interior_stairs")
+            else ""
+        )
     )
 
     model = voxel.Model(vox=vox, blocks=blocks, meta={"source": path, "mode": "spec"})
@@ -253,6 +258,9 @@ def run_spec(path: str, out_dir: Path, name: str | None, seed: int | None = None
             "detail_blocks": sinfo["detail_blocks"],
             "ornament_patch": sinfo.get("ornament_patch", 0),
             "ornament_prop": sinfo.get("ornament_prop", 0),
+            "interior_walls": sinfo.get("interior_walls", 0),
+            "interior_stairs": sinfo.get("interior_stairs", 0),
+            "interior": bool(getattr(spec, "interior", False)),
             "detail": spec.detail,
             "ornament": bool(getattr(spec, "ornament", False)),
             "roof": (raw.get("roof") or {}).get("type", "flat"),

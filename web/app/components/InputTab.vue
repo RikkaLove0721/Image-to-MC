@@ -15,6 +15,8 @@ const props = defineProps<{
     hint?: string
     /** 模型总宽（格）。0/缺省 = 自动 */
     modelWidth?: number
+    /** 室内设计：每层隔房间 + 层间架楼梯 */
+    interior?: boolean
     width?: number
   } | null
 }>()
@@ -80,6 +82,13 @@ const complexity = ref(2)
  */
 const modelWidth = ref(0)
 const WIDTH_PRESETS = [0, 48, 80, 112, 132]
+
+/**
+ * 室内设计：打开后构建端会给每层楼隔房间（墙上留门洞），
+ * 并在相邻两层之间架「走一格高一格」的整方块楼梯，楼梯上方的
+ * 楼板开井。外轮廓一格不变，只是屋里不再是空的。
+ */
+const interior = ref(false)
 
 const COMPLEXITY_LABEL: Record<number, string> = {
   1: '简易 · 只有主体',
@@ -313,6 +322,7 @@ function persistSettings() {
         craft: craft.value,
         complexity: complexity.value,
         modelWidth: modelWidth.value,
+        interior: interior.value,
         hint: aiCfg.hint,
       },
     }).catch(() => {
@@ -321,7 +331,7 @@ function persistSettings() {
   }, 500)
 }
 
-watch([scale, detailLevel, craft, complexity, modelWidth, () => aiCfg.hint], persistSettings)
+watch([scale, detailLevel, craft, complexity, modelWidth, interior, () => aiCfg.hint], persistSettings)
 
 /* ---- AI 配置与出图 ---- */
 
@@ -352,6 +362,7 @@ onMounted(async () => {
     if (typeof st.craft === 'number') craft.value = Math.min(2, Math.max(0, Math.round(st.craft)))
     if (typeof st.complexity === 'number') complexity.value = Math.min(5, Math.max(1, Math.round(st.complexity)))
     if (typeof st.modelWidth === 'number') modelWidth.value = Math.max(0, Math.min(132, Math.round(st.modelWidth)))
+    if (typeof st.interior === 'boolean') interior.value = st.interior
     if (typeof st.hint === 'string') aiCfg.hint = st.hint
   }
   // 灌完之后放开写入：否则一进项目就把同样的值再写一遍，
@@ -453,6 +464,7 @@ async function makePlan() {
         craft: craft.value,
         complexity: complexity.value,
         targetWidth: modelWidth.value || undefined,
+        interior: interior.value,
         hint: aiCfg.hint,
       },
     })
@@ -533,6 +545,9 @@ async function buildPlan() {
   xiaocTell('build-start')
   // 用户手改蓝图时可能把 seed 删掉了：补回来，生成出来的模型才可复现
   if (aiSeed.value && spec.seed == null) spec.seed = aiSeed.value
+  // 室内设计是构建期开关，不靠 AI 写：每次构建都以界面上的开关为准，
+  // 这样"先出方案、再打开室内"也能立刻生效。
+  spec.interior = interior.value
   try {
     const res = await $fetch<{ job: any }>(`/api/projects/${props.projectId}/ai/build`, {
       method: 'POST',
@@ -777,6 +792,28 @@ watch(log, scrollLog)
                 （一座 41 米宽的大教堂被估成 18 米，出来只有 36 格，玫瑰窗都挖不出来）。
                 <b>大教堂、宫殿、公共建筑直接选 112 或 132</b>；小住宅、亭子选 48 就够。
                 改完重新生成一次蓝图，AI 会按这个总宽排开间。
+              </span>
+            </div>
+          </div>
+          <div class="field" style="grid-column: 1 / -1">
+            <label class="field-label" style="display: flex; align-items: center; gap: 8px">
+              室内设计
+              <b style="color: var(--brand-deep)">
+                {{ interior ? '开 · 隔房间 + 楼梯' : '关 · 只有外壳' }}
+              </b>
+            </label>
+            <div class="chips">
+              <button class="chip" :class="{ active: !interior }" @click="interior = false">关闭</button>
+              <button class="chip" :class="{ active: interior }" @click="interior = true">打开</button>
+            </div>
+            <div class="fusion-note" style="margin-top: 8px">
+              <UiIcon name="info" :size="14" />
+              <span>
+                打开后屋里不再是空的：每层楼按面积随机隔成 2~6 间，隔墙材料跟主体走，
+                每道墙上留 2 格高、1~2 格宽的门洞；相邻两层之间架一部
+                <b>走一格高一格</b>的整方块楼梯，楼梯上方的楼板开 2 格长的井，
+                玩家能从屋里爬上去。<b>外轮廓一格不变</b>，只多出室内方块；
+                六边形、圆形、楔形这类特殊体块不做分隔，整块当一间。
               </span>
             </div>
           </div>

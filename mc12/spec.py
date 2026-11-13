@@ -652,6 +652,9 @@ class Spec:
     scale: float = 2.0
     # 结构数量等级 1~5：不是"细节多少"，是建筑物由几个部分组成
     complexity: int = 1
+    # 室内设计：每层随机隔房间（留门洞）+ 层间架楼梯（上层楼板开楼梯井）。
+    # 这是构建端的一次成形，不进 AI 提示词 —— AI 只需要写好外壳。
+    interior: bool = False
     target_height: int = 0
     # 复现用的种子：同样的 seed + 同样的蓝图 = 同样的模型
     seed: int = 0
@@ -1420,6 +1423,17 @@ def loads(raw: dict) -> Spec:
     if ornament:
         detail_level = max(detail_level, 4)
 
+    # ---- 室内设计 ----
+    # 只认显式开关（true / 1 / yes / on）。默认关：大多数人是拿模型去
+    # 当摆件/远景，室内方块会白白多出几千块，还会把方块数预算吃掉。
+    interior_raw = raw.get("interior")
+    if isinstance(interior_raw, bool):
+        interior = interior_raw
+    elif isinstance(interior_raw, str):
+        interior = interior_raw.strip().lower() in ("1", "true", "yes", "on")
+    else:
+        interior = bool(int(interior_raw or 0)) if isinstance(interior_raw, (int, float)) else False
+
     return Spec(
         name=str(raw.get("name") or "model"),
         palette=mats,
@@ -1432,6 +1446,7 @@ def loads(raw: dict) -> Spec:
         target_width=real_w,
         scale=scale_v,
         complexity=max(1, min(5, _level)),
+        interior=interior,
         target_height=real_h,
         seed=int(raw.get("seed") or 0) or random.SystemRandom().randint(1, 99999),
         volumes=vols,
@@ -1474,6 +1489,8 @@ class _Builder:
         # 这里把"按高度平移"收在 put/carve/get 三个口子上：
         # 画谁的构件就先把 ctx 设成谁，剩下的照旧写正交坐标。
         self.ctx: Volume | None = None
+        self.stair_log: list = []
+        self.link_log: list = []
         for blk in spec.palette.values():
             self._idx(blk)
 
@@ -3110,6 +3127,336 @@ class _Builder:
             return 0.0
         return int((self.vox == self._idx(trim)).sum()) / total
 
+    # ---- 室内设计 ----
+    # 开关打开后每层楼自动隔房间、层与层之间架楼梯。三件事必须一起做：
+    # 房间要有门（否则是死盒子）、楼梯要在上层楼板开洞（否则爬不出去）、
+    # 隔墙不能从楼梯井中间穿过去（否则楼梯被砌死）。
+    #
+    # 楼梯用整方块做「走一格高一格」—— MC 里没有更陡的走法。层高 4 格时
+    # 就是 3 级台阶，刚好顶到上层楼板；层高 3 格只有 2 级，也能爬（要跳一下）。
+    # 特殊平面（六边形/圆/楔形/收窄体）不做分隔，整块当一间 —— 直角隔墙
+    # 塞不进斜轮廓，硬塞会在墙上戳出洞。
+
+    INT_MIN_ROOM = 4      # 一间房的最小内空边长（格）
+    INT_DOOR_MAX_H = 3    # 门高上限；房间矮时降到 2，2 格是硬下限
+
+    def _wall_mat(self, rnd: random.Random) -> Block:
+        """室内隔墙的材料：优先用线脚色，其次木作色，最后跟墙。
+
+        不能直接用 `wall`：白墙房子里隔墙也是白的，打开屋门看进去
+        只有一片白，等于没做室内。挑一个和墙不同色的角色，观感立刻分开。
+        """
+        pal = self.spec.palette
+        wall = pal.get("wall")
+        picks = [m for m in (pal.get("trim"), pal.get("accent")) if m is not None and m != wall]
+        if not picks:
+            picks = [wall or (self.spec.volumes[0].mat if self.spec.volumes else None)]
+        picks = [p for p in picks if p is not None]
+        return picks[rnd.randrange(len(picks))] if picks else self.spec.volumes[0].mat
+
+    def _levels(self, v: Volume) -> list[tuple[int, int]]:
+        """体块里每一层的 (楼板高度, 上层楼板高度)。最后一层的上层是屋面。"""
+        step = max(2, v.h // max(1, v.floors)) if (v.floors and v.floor_mat is not None) else 0
+        ys = [v.y]
+        if step:
+            for k in range(1, v.floors + 1):
+                y = v.y + k * step
+                if y >= v.y1:
+                    break
+                ys.append(y)
+        return [(y, ys[i + 1] if i + 1 < len(ys) else v.y1) for i, y in enumerate(ys)]
+
+    def _pick_split(self, rect, reserved: set, rnd: random.Random):
+        """在房间里挑一条能砌墙的分割线：(axis, 位置, 起, 止)。
+
+        两头各留 INT_MIN_ROOM 格，保证切出来的两半都还是一间房；
+        整条线不能压到楼梯井上，压到就换一条，换不到就放弃这间 ——
+        宁可少隔一间，也不能把楼梯砌死。
+        """
+        x0, x1, z0, z1 = rect
+        need = 2 * self.INT_MIN_ROOM + 1
+        axes = []
+        if x1 - x0 + 1 >= need:
+            axes.append("x")
+        if z1 - z0 + 1 >= need:
+            axes.append("z")
+        if not axes:
+            return None
+        # 优先切"长的那一边"：总是随机切会把 26×16 的大房间切成
+        # 一排 4×16 的走廊。切长边，切出来的房间才接近方正。
+        if len(axes) == 1:
+            axis = axes[0]
+        elif abs((x1 - x0) - (z1 - z0)) <= 1:
+            axis = axes[rnd.randrange(2)]
+        else:
+            axis = "x" if (x1 - x0) > (z1 - z0) else "z"
+        if axis == "x":
+            lo, hi, u0, u1 = x0, x1, z0, z1
+        else:
+            lo, hi, u0, u1 = z0, z1, x0, x1
+        for _ in range(8):
+            s = rnd.randint(lo + self.INT_MIN_ROOM, hi - self.INT_MIN_ROOM)
+            if axis == "x":
+                hit = any((s, u) in reserved for u in range(u0, u1 + 1))
+            else:
+                hit = any((u, s) in reserved for u in range(u0, u1 + 1))
+            if not hit:
+                return (axis, s, u0, u1)
+        return None
+
+    def _rooms(self, v: Volume, lo: int, hi: int, rnd: random.Random,
+               reserved: set) -> int:
+        """把一层楼隔成几间，返回砌了几道墙。
+
+        `lo` 是这层的楼板高度，`hi` 是它头顶那块楼板（或屋面）。房间净空是
+        lo+1 ~ hi-1，隔墙从地砖顶砌到天花板，门洞直接在这道墙上挖出来。
+        """
+        height = hi - lo - 1
+        if height < 2:
+            return 0
+        x0, x1 = v.x + 1, v.x1 - 1
+        z0, z1 = v.z + 1, v.z1 - 1
+        if x1 - x0 < 2 or z1 - z0 < 2:
+            return 0
+
+        walls: list[tuple] = []
+        rects = [(x0, x1, z0, z1)]
+        area = (x1 - x0 + 1) * (z1 - z0 + 1)
+        # 每 40 平方格一间：小屋 2 间、大宫殿 6 间。上限 6 是因为再多
+        # 就变成一串小格子，玩家进去像走迷宫，观感反而不如少几间。
+        target = max(2, min(6, area // 40))
+
+        for _ in range(24):
+            if len(rects) >= target:
+                break
+            order = sorted(
+                range(len(rects)),
+                key=lambda i: -((rects[i][1] - rects[i][0] + 1) * (rects[i][3] - rects[i][2] + 1)),
+            )
+            picked = None
+            for idx in order:
+                split = self._pick_split(rects[idx], reserved, rnd)
+                if split:
+                    picked = (idx, split)
+                    break
+            if picked is None:
+                break
+            idx, (axis, s, u0, u1) = picked
+            rect = rects[idx]
+            walls.append((axis, s, u0, u1))
+            if axis == "x":
+                rects[idx] = (rect[0], s - 1, rect[2], rect[3])
+                rects.append((s + 1, rect[1], rect[2], rect[3]))
+            else:
+                rects[idx] = (rect[0], rect[1], rect[2], s - 1)
+                rects.append((rect[0], rect[1], s + 1, rect[3]))
+
+        door_h = min(self.INT_DOOR_MAX_H, height)
+        built = 0
+        for axis, s, u0, u1 in walls:
+            placed: set[tuple[int, int, int]] = set()
+            # 一道墙只用一种材料。在块循环里调 _wall_mat 会得到
+            # 深棕/浅灰交替的"糖果条纹"墙 —— 第一版就是这样，
+            # 房子里像贴了一排马赛克。
+            mat = self._wall_mat(rnd)
+            for y in range(lo + 1, hi):
+                for u in range(u0, u1 + 1):
+                    x, z = (s, u) if axis == "x" else (u, s)
+                    if (x, z) in reserved:
+                        continue
+                    if self.get(x, y, z) < 0:
+                        self.put(x, y, z, mat)
+                        placed.add((x, y, z))
+            if not placed:
+                continue
+            built += 1
+            # 门：1 格宽，隔墙够长时给 2 格宽 —— 门洞大小跟着建筑大小走，
+            # 但高度不低于 2（1 格高的门只能爬过去）。
+            span = u1 - u0 + 1
+            door_w = 2 if span >= 14 else 1
+            for _ in range(8):
+                start = rnd.randint(u0 + 1, max(u0 + 1, u1 - door_w))
+                cells = []
+                for du in range(door_w):
+                    u = start + du
+                    x, z = (s, u) if axis == "x" else (u, s)
+                    cells.append((x, z))
+                if any((x, z) in reserved for x, z in cells):
+                    continue
+                if any((x, lo + 1, z) not in placed for x, z in cells):
+                    continue
+                for y in range(lo + 1, lo + 1 + door_h):
+                    for x, z in cells:
+                        if (x, y, z) in placed:
+                            self.carve(x, y, z)
+                break
+        return built
+
+    def _stairs(self, v: Volume, y0: int, y1: int, rnd: random.Random,
+                reserved: dict) -> int:
+        """在 y0 层与 y1 层之间架一部楼梯，返回台阶数（0 = 放不下）。
+
+        走法就是 MC 里最土也最好用的那种：往前走一格、往上一格，
+        每级都是一整块方块。上层楼板在"头会撞到"的那两列开洞，
+        于是楼梯井只有 2 格长，不是把整层楼板掀掉。
+        """
+        rise = y1 - y0
+        if rise < 3:
+            return 0
+        n = rise - 1  # 台阶块数：1 格高 1 格远，顶层那格由楼板自己当
+        ix0, ix1 = v.x + 1, v.x1 - 1
+        iz0, iz1 = v.z + 1, v.z1 - 1
+        cands = []
+        # 贴着内墙根走，别占房间正中间；四个角都试一遍，
+        # 总有一个角没被别的体块/窗框占掉。
+        if ix1 - ix0 + 1 >= n + 2:
+            cands.append((1, 0, ix0, iz0))
+            cands.append((-1, 0, ix1, iz1))
+        if iz1 - iz0 + 1 >= n + 2:
+            cands.append((0, 1, ix0, iz0))
+            cands.append((0, -1, ix1, iz1))
+        rnd.shuffle(cands)
+        mat = self._wall_mat(rnd)
+        for dx, dz, sx, sz in cands:
+            cells = [(sx + dx * i, sz + dz * i) for i in range(n)]
+            ok = True
+            for i, (x, z) in enumerate(cells):
+                h = y0 + 1 + i
+                # 台阶之上要有 2 格净空（玩家身高），撞到楼板的那几列
+                # 待会儿开洞；这里先确认没有别的实体（邻栋的墙、窗台）。
+                for yy in range(h, min(y1, h + 3)):
+                    if self.get(x, yy, z) >= 0:
+                        ok = False
+                        break
+                if not ok:
+                    break
+            if not ok:
+                continue
+            for i, (x, z) in enumerate(cells):
+                h = y0 + 1 + i
+                self.put(x, h, z, mat)
+                if h >= y1 - 2:
+                    self.carve(x, y1, z)
+            self.stair_log.append((y0, y1, cells))
+            # 楼梯井 + 进出口各留一格：隔墙不许压在楼梯上/楼梯口
+            for lv in (y0, y1):
+                res = reserved.setdefault(lv, set())
+                res.update(cells)
+                res.add((sx - dx, sz - dz))
+                res.add((sx + dx * n, sz + dz * n))
+            return n
+        return 0
+
+    def interior(self) -> tuple[int, int]:
+        """给每个空心体块加室内：隔墙 + 楼梯。返回 (隔墙数, 楼梯数)。"""
+        if self.spec.subject != "building":
+            return 0, 0
+        rnd = random.Random((int(self.spec.seed) or 1) * 7919 + 17)
+        walls = stairs = 0
+        for v in self.spec.volumes:
+            # 实心体块（角塔、凸窗、设备房）没有室内。收窄体、斜置体、
+            # 斜楼板的楼板/墙每层都在平移或倾斜，按固定标高隔出来的房间
+            # 会和外壳错位 —— 实测楼梯井会被上层楼板盖住，二层变成密室。
+            # 这些形体一律当"整块一间"，不做室内。
+            if v.aux or not v.hollow or v.taper_axis or v.slanted:
+                continue
+            if v.plan() is not None:
+                continue  # 六边形/圆/楔形：整块当一间，不做分隔
+            if v.w < 8 or v.d < 8:
+                continue
+            levels = self._levels(v)
+            if not levels:
+                continue
+            reserved: dict[int, set] = {}
+            with self.using(v):
+                for i in range(len(levels) - 1):
+                    y0, y1 = levels[i]
+                    stairs += 1 if self._stairs(v, y0, y1, rnd, reserved) else 0
+                for i, (lo, hi) in enumerate(levels):
+                    walls += self._rooms(v, lo, hi, rnd, reserved.get(lo, set()))
+        doors = self._link_volumes()
+        return walls + doors, stairs
+
+    def _link_volumes(self) -> int:
+        """相邻体块之间开一道门，返回开的数量。
+
+        主楼 + 侧翼各是一个独立体块，各画各的壳，贴在一起时中间是
+        两层墙 —— 从主楼进不去侧翼，屋里再漂亮也没意义。这里在共用的
+        那面墙上开一个 2 格高 1 格宽的门洞，只找"两边都站在地板上、
+        头顶两格都是空的"位置，不会凿穿楼板或屋面。
+        """
+        vols = [
+            v for v in self.spec.volumes
+            if v.hollow and not v.aux and not v.slanted and not v.taper_axis and v.plan() is None
+        ]
+        pairs: list[tuple] = []
+        for i, a in enumerate(vols):
+            for b in vols[i + 1:]:
+                # 间隔 0 是贴在一起（两层壳），间隔 1 是中间夹一格空气 ——
+                # 两种都算"一栋楼的两个部分"，都要能走通。间隔再大就是
+                # 两栋独立的房子了，凿穿它反而错。
+                if b.x - a.x1 in (1, 2):
+                    pairs.append(("x", a, b))
+                elif a.x - b.x1 in (1, 2):
+                    pairs.append(("x", b, a))
+                elif b.z - a.z1 in (1, 2):
+                    pairs.append(("z", a, b))
+                elif a.z - b.z1 in (1, 2):
+                    pairs.append(("z", b, a))
+
+        made = 0
+        for axis, near, far in pairs:
+            if axis == "x":
+                u0 = max(near.z + 1, far.z + 1)
+                u1 = min(near.z1 - 1, far.z1 - 1)
+            else:
+                u0 = max(near.x + 1, far.x + 1)
+                u1 = min(near.x1 - 1, far.x1 - 1)
+            if u1 - u0 < 1:
+                continue
+            y0 = max(near.y, far.y) + 2
+            y1 = min(near.y1, far.y1) - 2
+
+            spot = None
+            for y in range(y0, y1 + 1):
+                for u in range(u0, u1 + 1):
+                    if axis == "x":
+                        wall = [(near.x1, y, u), (far.x, y, u)]
+                        side = [(near.x1 - 1, y, u), (far.x + 1, y, u)]
+                    else:
+                        wall = [(u, y, near.z1), (u, y, far.z)]
+                        side = [(u, y, near.z1 - 1), (u, y, far.z + 1)]
+                    # 墙上是实心（两格高），两侧各是一间站得下人的屋子
+                    if not all(self.get(x, yy, z) >= 0 for x, _, z in wall for yy in (y, y + 1)):
+                        continue
+                    ok = True
+                    for x, _, z in side:
+                        if self.get(x, y, z) >= 0 or self.get(x, y + 1, z) >= 0:
+                            ok = False
+                            break
+                        if self.get(x, y - 1, z) < 0:  # 脚下没地板 = 悬空，另找
+                            ok = False
+                            break
+                    if ok:
+                        spot = (u, y)
+                        break
+                if spot:
+                    break
+            if not spot:
+                self.link_log.append((axis, near.x, far.x, near.z, far.z, None))
+                continue
+            u, y = spot
+            self.link_log.append((axis, near.x, far.x, near.z, far.z, spot))
+            for yy in (y, y + 1):
+                if axis == "x":
+                    self.carve(near.x1, yy, u)
+                    self.carve(far.x, yy, u)
+                else:
+                    self.carve(u, yy, near.z1)
+                    self.carve(u, yy, far.z)
+            made += 1
+        return made
+
     def refine(self) -> int:
         """按 detail 等级补细节：勒脚/檐口兜底、每层腰线、四角壁柱。
 
@@ -3190,6 +3537,12 @@ class _Builder:
             self.spec.details, key=lambda x: self.DETAIL_ORDER.get(str(x.get("type")), 9)
         ):
             n_det += self.detail(item)
+        # 室内放在线脚之前：线脚只碰外露的墙，室内隔墙全在屋里，
+        # 两边互不干扰；但顺序反过来（先 refine）会让楼梯井开洞时
+        # 把刚补好的腰线一起挖掉。
+        n_wall = n_stair = 0
+        if getattr(self.spec, "interior", False):
+            n_wall, n_stair = self.interior()
         n_det += self.refine()
         # 观赏性细节最后上：它要看到全部体块、窗、屋顶、线脚才放得准。
         # 放在 refine 之后还有一个原因 —— 线脚/腰线是"结构色"，
@@ -3202,6 +3555,8 @@ class _Builder:
             "detail_blocks": n_det,
             "ornament_patch": int(orn.get("patch", 0)),
             "ornament_prop": int(orn.get("prop", 0)),
+            "interior_walls": n_wall,
+            "interior_stairs": n_stair,
         }
         return self.vox, self.blocks, info
 

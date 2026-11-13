@@ -331,6 +331,9 @@ export default defineEventHandler(async (event) => {
   // 这一档**不交给 AI** 写：它一次只能写得动三五个体块，写三十个坐标必歪。
   // 计划端只负责把等级带进蓝图，真正的体量由构建端长（mc12/spec.py）。
   const complexity = Math.max(1, Math.min(5, Math.round(Number(body.complexity) || 2)))
+  // 室内设计：构建端开关，AI 不参与。写进蓝图是为了让"蓝图全文"里
+  // 能看见它，也让仓库里的 _spec.json 重建时保持同样的室内。
+  const interior = body.interior === true || body.interior === 'true' || body.interior === 1
   const sizeNote =
     `\n- **先估真实尺寸，再乘比例尺**。估尺寸的步骤（不要跳步）：` +
     `① 数立面有几排窗带 = 层数；② 层高按用途取 3.2 米（住宅/办公）/ 3.8 米（教学/图书馆），` +
@@ -773,6 +776,7 @@ export default defineEventHandler(async (event) => {
       s.complete = { cut: cutSides, ratio: compRatio, bays: compBays || 0 }
     }
     if (aspect > 0) s.aspect = aspect
+    if (interior) s.interior = true
     return s
   }
   applySize(spec)
