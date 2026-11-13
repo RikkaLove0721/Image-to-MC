@@ -1,0 +1,7 @@
+# 打包进 exe 的第三方源码：按二进制处理，别做换行转换。
+# three.js 是 1.2 MB 的 module，走 autocrlf 会把每一行加一个 \r ——
+# 体积变大、gzip 效率下降，导出分享页时会白吃几十 KB。
+web/public/vendor/engine/*.js -text
+
+# 体素/产物里的 .txt 是给人看的，保持原样
+*.schematic -text
